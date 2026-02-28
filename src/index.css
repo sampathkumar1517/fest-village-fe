@@ -104,11 +104,25 @@ body {
   padding: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: var(--color-bg);
+  background: #fef3e6;
   background-image: 
-    radial-gradient(circle at 20% 80%, rgba(207, 157, 123, 0.03) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(114, 75, 57, 0.04) 0%, transparent 50%);
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 20px,
+      rgba(255, 140, 0, 0.02) 20px,
+      rgba(255, 140, 0, 0.02) 21px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 20px,
+      rgba(255, 140, 0, 0.02) 20px,
+      rgba(255, 140, 0, 0.02) 21px
+    );
   position: relative;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body::before {

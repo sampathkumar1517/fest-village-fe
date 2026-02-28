@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
+import BottomNav from "../components/BottomNav";
 import "./festival.css";
 
 const FestivalDetails = () => {
+  const location = useLocation();
   const [festivals, setFestivals] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [festival, setFestival] = useState({
     name: "",
     amountPerFamily: "",
@@ -18,9 +22,23 @@ const FestivalDetails = () => {
     setFestival((prev) => ({ ...prev, [name]: value }));
   };
 
+  useEffect(() => {
+    // Load from localStorage
+    const stored = JSON.parse(localStorage.getItem("festivals") || "[]");
+    setFestivals(stored);
+  }, []);
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    setFestivals([...festivals, { ...festival, id: Date.now() }]);
+    let updated;
+    if (editingId) {
+      updated = festivals.map(f => f.id === editingId ? { ...festival, id: editingId } : f);
+      setEditingId(null);
+    } else {
+      updated = [...festivals, { ...festival, id: Date.now() }];
+    }
+    setFestivals(updated);
+    localStorage.setItem("festivals", JSON.stringify(updated));
     setFestival({
       name: "",
       amountPerFamily: "",
@@ -32,13 +50,29 @@ const FestivalDetails = () => {
     setShowForm(false);
   };
 
+  const handleEdit = (fest) => {
+    setFestival(fest);
+    setEditingId(fest.id);
+    setShowForm(true);
+  };
+
+  const handleDelete = (id) => {
+    if (window.confirm("Are you sure you want to delete this festival?")) {
+      const updated = festivals.filter(f => f.id !== id);
+      setFestivals(updated);
+      localStorage.setItem("festivals", JSON.stringify(updated));
+    }
+  };
+
+  const isActive = (path) => location.pathname === path;
+
   return (
     <div className="festival-container">
       {/* Header */}
       <header className="festival-header">
         <div className="header-content">
           <div className="logo-section">
-            <div className="logo">🎉</div>
+            <div className="logo">🪔</div>
             <div>
               <h1>Village Festival Manager</h1>
               <p>Collection & Expense Tracker</p>
@@ -50,21 +84,42 @@ const FestivalDetails = () => {
 
       {/* Navigation Tabs */}
       <nav className="festival-nav">
-        <button className="nav-tab active">⭐ Festivals</button>
-        <button className="nav-tab">₹ Collections</button>
-        <button className="nav-tab">☑ Expenses</button>
-        <button className="nav-tab">📊 Analytics</button>
-        <button className="nav-tab">💬 Review</button>
+        <Link to="/festival" className={`nav-tab ${isActive("/festival") || isActive("/") ? "active" : ""}`}>
+          ⭐ Festivals
+        </Link>
+        <Link to="/collection" className={`nav-tab ${isActive("/collection") ? "active" : ""}`}>
+          ₹ Collections
+        </Link>
+        <Link to="/expenses" className={`nav-tab ${isActive("/expenses") ? "active" : ""}`}>
+          ☑ Expenses
+        </Link>
+        <Link to="/analytics" className={`nav-tab ${isActive("/analytics") ? "active" : ""}`}>
+        🢅 Analytics
+        </Link>
+        <Link to="/review" className={`nav-tab ${isActive("/review") ? "active" : ""}`}>
+          💬 Review
+        </Link>
       </nav>
 
       {/* Main Content */}
       <main className="festival-content">
         <div className="content-header">
           <div>
-            <h2>⭐ Festivals</h2>
+            <h2>🪔Festivals</h2>
             <p className="subtitle">Manage your village festival details</p>
           </div>
-          <button className="btn-add-festival" onClick={() => setShowForm(true)}>
+          <button className="btn-add-festival" onClick={() => {
+            setShowForm(true);
+            setEditingId(null);
+            setFestival({
+              name: "",
+              amountPerFamily: "",
+              startDate: "",
+              endDate: "",
+              organisers: "",
+              inCharge: "",
+            });
+          }}>
             + Add Festival
           </button>
         </div>
@@ -72,10 +127,13 @@ const FestivalDetails = () => {
         {/* Festival Form */}
         {showForm && (
           <form onSubmit={handleSubmit} className="festival-form">
-            <h3>Create New Festival</h3>
+            <h3 className="form-title">
+              <span className="form-icon">🪔</span>
+              {editingId ? "Edit Festival Details" : "New Festival Details"}
+            </h3>
             <div className="form-grid">
               <label>
-                Festival Name
+                Festival Name *
                 <input
                   type="text"
                   name="name"
@@ -86,7 +144,7 @@ const FestivalDetails = () => {
                 />
               </label>
               <label>
-                Amount Per Family
+                Amount Per Family (₹) *
                 <input
                   type="number"
                   name="amountPerFamily"
@@ -97,49 +155,57 @@ const FestivalDetails = () => {
                 />
               </label>
               <label>
-                Collection Start Date
+                Collection Start Date *
                 <input
                   type="date"
                   name="startDate"
                   value={festival.startDate}
                   onChange={handleChange}
+                  placeholder="dd-mm-yyyy"
                   required
                 />
               </label>
               <label>
-                Festival End Date
+                Festival End Date *
                 <input
                   type="date"
                   name="endDate"
                   value={festival.endDate}
                   onChange={handleChange}
+                  placeholder="dd-mm-yyyy"
                   required
                 />
               </label>
               <label>
-                Organisers
+                Organizers
                 <input
                   type="text"
                   name="organisers"
                   value={festival.organisers}
                   onChange={handleChange}
-                  placeholder="Names of organisers"
+                  placeholder="e.g., Murugan Temple Committee"
                 />
               </label>
               <label>
-                In-Charge
+                Incharge Person
                 <input
                   type="text"
                   name="inCharge"
                   value={festival.inCharge}
                   onChange={handleChange}
-                  placeholder="Name of person in-charge"
+                  placeholder="e.g., Mr. Rajan"
                 />
               </label>
             </div>
             <div className="form-actions">
-              <button type="submit" className="btn-save">Save Festival</button>
-              <button type="button" className="btn-cancel" onClick={() => setShowForm(false)}>Cancel</button>
+              <button type="button" className="btn-cancel" onClick={() => {
+                setShowForm(false);
+                setEditingId(null);
+              }}>Cancel</button>
+              <button type="submit" className="btn-save">
+                <span className="btn-icon">+</span>
+                {editingId ? "Update Festival" : "Create Festival"}
+              </button>
             </div>
           </form>
         )}
@@ -159,21 +225,54 @@ const FestivalDetails = () => {
         {/* Festivals List */}
         {festivals.length > 0 && (
           <div className="festivals-list">
-            {festivals.map((fest) => (
-              <div key={fest.id} className="festival-card">
-                <h3>{fest.name}</h3>
-                <div className="festival-details">
-                  <p><strong>Amount per Family:</strong> ₹{fest.amountPerFamily}</p>
-                  <p><strong>Collection Period:</strong> {fest.startDate} to {fest.endDate}</p>
-                  <p><strong>Organisers:</strong> {fest.organisers}</p>
-                  <p><strong>In-Charge:</strong> {fest.inCharge}</p>
+            {festivals.map((fest) => {
+              const today = new Date();
+              const endDate = new Date(fest.endDate);
+              const isActive = endDate >= today;
+              
+              return (
+                <div key={fest.id} className="festival-card">
+                  <div className="festival-card-header">
+                    <div className="festival-card-title-row">
+                      <h3>{fest.name}</h3>
+                      <button className="btn-delete-icon" onClick={() => handleDelete(fest.id)}>
+                        🗑️
+                      </button>
+                    </div>
+                    {isActive && <span className="festival-status-badge">Active</span>}
+                  </div>
+                  <div className="festival-details">
+                    <div className="festival-detail-item">
+                      <span className="detail-icon">₹</span>
+                      <span className="detail-text">
+                        <strong>Per Family:</strong> ₹{Number(fest.amountPerFamily).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="festival-detail-item">
+                      <span className="detail-icon">📅</span>
+                      <span className="detail-text">
+                        <strong>Collection:</strong> {fest.startDate} → {fest.endDate}
+                      </span>
+                    </div>
+                    <div className="festival-detail-item">
+                      <span className="detail-icon">👥</span>
+                      <span className="detail-text">
+                        <strong>Organizers:</strong> {fest.organisers || "N/A"}
+                      </span>
+                    </div>
+                    <div className="festival-detail-item">
+                      <span className="detail-icon">👤</span>
+                      <span className="detail-text">
+                        <strong>Incharge:</strong> {fest.inCharge || "N/A"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="festival-actions">
+                    <button className="btn-edit" onClick={() => handleEdit(fest)}>Edit</button>
+                  </div>
                 </div>
-                <div className="festival-actions">
-                  <button className="btn-edit">Edit</button>
-                  <button className="btn-delete">Delete</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
@@ -182,6 +281,9 @@ const FestivalDetails = () => {
       <footer className="festival-footer">
         <p>© 2026. Built with <span className="heart">❤</span> using caffeine.ai</p>
       </footer>
+
+      {/* Bottom Navigation for Mobile */}
+      <BottomNav />
     </div>
   );
 };
