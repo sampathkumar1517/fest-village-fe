@@ -1,0 +1,10 @@
+/* expenses page styles */
+.expense-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 20px;
+}
+.expense-list li {
+  padding: 4px 0;
+  border-bottom: 1px solid #eee;
+}

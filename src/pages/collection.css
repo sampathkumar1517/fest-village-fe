@@ -1,0 +1,12 @@
+/* collection page specific */
+.records-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+.records-table th,
+.records-table td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: left;
+}

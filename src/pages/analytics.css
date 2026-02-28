@@ -1,0 +1,11 @@
+/* analytics page styles */
+.stats {
+  display: flex;
+  gap: 20px;
+  margin-top: 20px;
+}
+.stat {
+  background: #f9f9f9;
+  padding: 10px;
+  border-radius: 4px;
+}
