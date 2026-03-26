@@ -1,291 +1,140 @@
-import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
-import BottomNav from "../components/BottomNav";
-import "./festival.css";
+import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
+import AddFestivalModal from "../components/AddFestivalModal";
+import { getFestivals } from "../utils/api";
 
-const FestivalDetails = () => {
-  const location = useLocation();
+export default function FestivalDetails() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [festivals, setFestivals] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [festival, setFestival] = useState({
-    name: "",
-    amountPerFamily: "",
-    startDate: "",
-    endDate: "",
-    organisers: "",
-    inCharge: "",
-  });
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFestival((prev) => ({ ...prev, [name]: value }));
-  };
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Load from localStorage
-    const stored = JSON.parse(localStorage.getItem("festivals") || "[]");
-    setFestivals(stored);
+    fetchFestivals();
   }, []);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    let updated;
-    if (editingId) {
-      updated = festivals.map(f => f.id === editingId ? { ...festival, id: editingId } : f);
-      setEditingId(null);
-    } else {
-      updated = [...festivals, { ...festival, id: Date.now() }];
-    }
-    setFestivals(updated);
-    localStorage.setItem("festivals", JSON.stringify(updated));
-    setFestival({
-      name: "",
-      amountPerFamily: "",
-      startDate: "",
-      endDate: "",
-      organisers: "",
-      inCharge: "",
-    });
-    setShowForm(false);
-  };
-
-  const handleEdit = (fest) => {
-    setFestival(fest);
-    setEditingId(fest.id);
-    setShowForm(true);
-  };
-
-  const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this festival?")) {
-      const updated = festivals.filter(f => f.id !== id);
-      setFestivals(updated);
-      localStorage.setItem("festivals", JSON.stringify(updated));
+  const fetchFestivals = async () => {
+    setIsLoading(true);
+    try {
+      const response = await getFestivals();
+      if (response && response.listData && response.listData.length > 0) {
+        setFestivals(response.listData[0].data || []);
+      } else {
+        setFestivals([]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch festivals:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const isActive = (path) => location.pathname === path;
+  const handleFestivalCreated = () => {
+    fetchFestivals();
+  };
 
   return (
-    <div className="festival-container">
-      {/* Header */}
-      <header className="festival-header">
-        <div className="header-content">
-          <div className="logo-section">
-            <div className="logo">🪔</div>
-            <div>
-              <h1>Village Festival Manager</h1>
-              <p>Collection & Expense Tracker</p>
-            </div>
-          </div>
-          <a href="#" className="manage-link">Manage your<br />Festival Finances</a>
+    <div className="flex flex-col h-full relative">
+      <div className="flex justify-between items-start mb-12">
+        <div>
+          <h2 className="text-3xl font-bold font-serif text-gray-900 flex items-center mb-2">
+            <StarOutlineIcon className="w-8 h-8 text-brand mr-2" />
+            Festivals
+          </h2>
+          <p className="text-gray-600 font-serif">Manage your village festival details</p>
         </div>
-      </header>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="bg-[#d35400] text-white px-4 py-2 rounded-md font-medium flex items-center hover:bg-brand-light transition-colors shadow-sm"
+        >
+          <Plus className="w-4 h-4 mr-2" /> Add Festival
+        </button>
+      </div>
 
-      {/* Navigation Tabs */}
-      <nav className="festival-nav">
-        <Link to="/festival" className={`nav-tab ${isActive("/festival") || isActive("/") ? "active" : ""}`}>
-          ⭐ Festivals
-        </Link>
-        <Link to="/collection" className={`nav-tab ${isActive("/collection") ? "active" : ""}`}>
-          ₹ Collections
-        </Link>
-        <Link to="/expenses" className={`nav-tab ${isActive("/expenses") ? "active" : ""}`}>
-          ☑ Expenses
-        </Link>
-        <Link to="/analytics" className={`nav-tab ${isActive("/analytics") ? "active" : ""}`}>
-        🢅 Analytics
-        </Link>
-        <Link to="/review" className={`nav-tab ${isActive("/review") ? "active" : ""}`}>
-          💬 Review
-        </Link>
-      </nav>
-
-      {/* Main Content */}
-      <main className="festival-content">
-        <div className="content-header">
-          <div>
-            <h2>🪔Festivals</h2>
-            <p className="subtitle">Manage your village festival details</p>
+      {isLoading ? (
+        <div className="flex-grow flex items-center justify-center -mt-16">
+          <p className="text-gray-600 font-serif">Loading festivals...</p>
+        </div>
+      ) : festivals.length === 0 ? (
+        <div className="flex-grow flex flex-col items-center justify-center -mt-16">
+          <div className="w-16 h-16 mb-4">
+            {/* Approximate diya placeholder icon */}
+            <img
+              src="https://village-festival-manager-kte.caffeine.xyz/assets/diya-2_rK70C4.svg"
+              alt="Diya"
+              className="w-full h-full object-contain drop-shadow-sm"
+              onError={(e) => { e.target.style.display = "none"; }}
+            />
           </div>
-          <button className="btn-add-festival" onClick={() => {
-            setShowForm(true);
-            setEditingId(null);
-            setFestival({
-              name: "",
-              amountPerFamily: "",
-              startDate: "",
-              endDate: "",
-              organisers: "",
-              inCharge: "",
-            });
-          }}>
-            + Add Festival
+          <h3 className="text-2xl font-bold font-serif text-gray-900 mb-2">No festivals yet</h3>
+          <p className="text-gray-600 mb-6 font-serif">
+            Create your first festival to start tracking collections
+          </p>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-[#d35400] text-white px-6 py-2.5 rounded-md font-medium flex items-center hover:bg-brand-light transition-colors shadow-md"
+          >
+            <Plus className="w-5 h-5 mr-2" /> Add First Festival
           </button>
         </div>
-
-        {/* Festival Form */}
-        {showForm && (
-          <form onSubmit={handleSubmit} className="festival-form">
-            <h3 className="form-title">
-              <span className="form-icon">🪔</span>
-              {editingId ? "Edit Festival Details" : "New Festival Details"}
-            </h3>
-            <div className="form-grid">
-              <label>
-                Festival Name *
-                <input
-                  type="text"
-                  name="name"
-                  value={festival.name}
-                  onChange={handleChange}
-                  placeholder="e.g., Lord Murugan Festival"
-                  required
-                />
-              </label>
-              <label>
-                Amount Per Family (₹) *
-                <input
-                  type="number"
-                  name="amountPerFamily"
-                  value={festival.amountPerFamily}
-                  onChange={handleChange}
-                  placeholder="e.g., 500"
-                  required
-                />
-              </label>
-              <label>
-                Collection Start Date *
-                <input
-                  type="date"
-                  name="startDate"
-                  value={festival.startDate}
-                  onChange={handleChange}
-                  placeholder="dd-mm-yyyy"
-                  required
-                />
-              </label>
-              <label>
-                Festival End Date *
-                <input
-                  type="date"
-                  name="endDate"
-                  value={festival.endDate}
-                  onChange={handleChange}
-                  placeholder="dd-mm-yyyy"
-                  required
-                />
-              </label>
-              <label>
-                Organizers
-                <input
-                  type="text"
-                  name="organisers"
-                  value={festival.organisers}
-                  onChange={handleChange}
-                  placeholder="e.g., Murugan Temple Committee"
-                />
-              </label>
-              <label>
-                Incharge Person
-                <input
-                  type="text"
-                  name="inCharge"
-                  value={festival.inCharge}
-                  onChange={handleChange}
-                  placeholder="e.g., Mr. Rajan"
-                />
-              </label>
-            </div>
-            <div className="form-actions">
-              <button type="button" className="btn-cancel" onClick={() => {
-                setShowForm(false);
-                setEditingId(null);
-              }}>Cancel</button>
-              <button type="submit" className="btn-save">
-                <span className="btn-icon">+</span>
-                {editingId ? "Update Festival" : "Create Festival"}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* Empty State */}
-        {festivals.length === 0 && !showForm && (
-          <div className="empty-state">
-            <div className="empty-icon">🎆</div>
-            <h3>No festivals yet</h3>
-            <p>Create your first festival to start tracking collections</p>
-            <button className="btn-add-first" onClick={() => setShowForm(true)}>
-              + Add First Festival
-            </button>
-          </div>
-        )}
-
-        {/* Festivals List */}
-        {festivals.length > 0 && (
-          <div className="festivals-list">
-            {festivals.map((fest) => {
-              const today = new Date();
-              const endDate = new Date(fest.endDate);
-              const isActive = endDate >= today;
-              
-              return (
-                <div key={fest.id} className="festival-card">
-                  <div className="festival-card-header">
-                    <div className="festival-card-title-row">
-                      <h3>{fest.name}</h3>
-                      <button className="btn-delete-icon" onClick={() => handleDelete(fest.id)}>
-                        🗑️
-                      </button>
-                    </div>
-                    {isActive && <span className="festival-status-badge">Active</span>}
-                  </div>
-                  <div className="festival-details">
-                    <div className="festival-detail-item">
-                      <span className="detail-icon">₹</span>
-                      <span className="detail-text">
-                        <strong>Per Family:</strong> ₹{Number(fest.amountPerFamily).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="festival-detail-item">
-                      <span className="detail-icon">📅</span>
-                      <span className="detail-text">
-                        <strong>Collection:</strong> {fest.startDate} → {fest.endDate}
-                      </span>
-                    </div>
-                    <div className="festival-detail-item">
-                      <span className="detail-icon">👥</span>
-                      <span className="detail-text">
-                        <strong>Organizers:</strong> {fest.organisers || "N/A"}
-                      </span>
-                    </div>
-                    <div className="festival-detail-item">
-                      <span className="detail-icon">👤</span>
-                      <span className="detail-text">
-                        <strong>Incharge:</strong> {fest.inCharge || "N/A"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="festival-actions">
-                    <button className="btn-edit" onClick={() => handleEdit(fest)}>Edit</button>
+      ) : (
+        <div className="flex-grow -mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {festivals.map((festival) => (
+              <div
+                key={festival.id}
+                className="bg-white rounded-xl shadow-sm border border-[#f0e0c8] p-5"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="font-serif font-bold text-lg text-gray-900">
+                      {festival.festivalName}
+                    </h3>
+                    <span className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-semibold ${festival.isActive ? 'bg-[#fff3e0] text-[#d35400]' : 'bg-gray-200 text-gray-600'}`}>
+                      {festival.isActive ? 'Active' : 'Inactive'}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
+                <div className="space-y-2 text-sm text-gray-700">
+                  <p>
+                    <strong>Per Family:</strong>{" "}
+                    ₹{Number(festival.amountPerFamily || 0).toLocaleString("en-IN")}
+                  </p>
+                  <p>
+                    <strong>Collection:</strong>{" "}
+                    {new Date(festival.collectionStartDate).toLocaleDateString()} → {new Date(festival.festivalEndDate).toLocaleDateString()}
+                  </p>
+                  {festival.organizerName && (
+                    <p>
+                      <strong>Organizers:</strong> {festival.organizerName}
+                    </p>
+                  )}
+                  {festival.InchargeName && (
+                    <p>
+                      <strong>Incharge:</strong> {festival.InchargeName}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-      </main>
+        </div>
+      )}
 
-      {/* Footer */}
-      <footer className="festival-footer">
-        <p>© 2026. Built with <span className="heart">❤</span> using caffeine.ai</p>
-      </footer>
-
-      {/* Bottom Navigation for Mobile */}
-      <BottomNav />
+      {isModalOpen && (
+        <AddFestivalModal
+          onClose={() => setIsModalOpen(false)}
+          onCreated={handleFestivalCreated}
+        />
+      )}
     </div>
   );
-};
+}
 
-export default FestivalDetails;
+// Custom hollow star icon
+function StarOutlineIcon({ className }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  );
+}

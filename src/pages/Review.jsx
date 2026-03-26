@@ -1,211 +1,66 @@
-import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import BottomNav from "../components/BottomNav";
-import "./review.css";
+import { MessageSquare, CheckCircle, AlertCircle } from "lucide-react";
 
-const Review = () => {
-  const location = useLocation();
-  const [feedback, setFeedback] = useState("");
-  const [rating, setRating] = useState(0);
-  const [suggestions, setSuggestions] = useState([]);
-  const [submitted, setSubmitted] = useState(false);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (feedback.trim() && rating > 0) {
-      const newSuggestion = {
-        id: Date.now(),
-        text: feedback,
-        rating: rating,
-        date: new Date().toLocaleDateString(),
-        status: "pending"
-      };
-      setSuggestions([...suggestions, newSuggestion]);
-      setFeedback("");
-      setRating(0);
-      setSubmitted(true);
-      
-      // In a real app, this would send to backend
-      console.log("Feedback received:", newSuggestion);
-      
-      setTimeout(() => setSubmitted(false), 3000);
-    }
-  };
-
-  const isActive = (path) => location.pathname === path;
-
+export default function Review() {
   return (
-    <div className="festival-container">
-      {/* Header */}
-      <header className="festival-header">
-        <div className="header-content">
-          <div className="logo-section">
-            <div className="logo">🎉</div>
+    <div className="flex flex-col h-full">
+      <div className="mb-6">
+        <h2 className="text-3xl font-bold font-serif text-gray-900 flex items-center mb-2">
+          <MessageSquare className="w-8 h-8 text-brand mr-2" />
+          Review & Feedback
+        </h2>
+        <p className="text-gray-600 font-serif">Audit festival accounts and community feedback</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="space-y-6">
+          <h3 className="text-xl font-bold font-serif text-gray-800 border-b border-gray-200 pb-2">Pending Approvals</h3>
+
+          <div className="bg-[#f8f5f0] border-l-4 border-amber-500 rounded-lg p-5 shadow-sm flex items-start gap-4">
+            <AlertCircle className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" />
             <div>
-              <h1>Village Festival Manager</h1>
-              <p>Collection & Expense Tracker</p>
+              <h4 className="font-bold text-gray-900 font-serif mb-1">Stage Decoration Invoice</h4>
+              <p className="text-sm text-gray-600 font-sans mb-4">Submitted by Ram (Decorator) for ₹15,000. Needs committee approval before payment.</p>
+              <div className="flex gap-3">
+                <button className="px-4 py-1.5 bg-[#d35400] text-white text-sm font-medium rounded hover:bg-brand transition font-sans shadow-sm">Approve</button>
+                <button className="px-4 py-1.5 border border-gray-300 text-gray-600 text-sm font-medium rounded hover:bg-gray-100 transition font-sans">Reject</button>
+              </div>
             </div>
           </div>
-          <a href="#" className="manage-link">Manage your<br />Festival Finances</a>
-        </div>
-      </header>
 
-      {/* Navigation Tabs */}
-      <nav className="festival-nav">
-        <Link to="/festival" className={`nav-tab ${isActive("/festival") || isActive("/") ? "active" : ""}`}>
-          ⭐ Festivals
-        </Link>
-        <Link to="/collection" className={`nav-tab ${isActive("/collection") ? "active" : ""}`}>
-          ₹ Collections
-        </Link>
-        <Link to="/expenses" className={`nav-tab ${isActive("/expenses") ? "active" : ""}`}>
-          ☑ Expenses
-        </Link>
-        <Link to="/analytics" className={`nav-tab ${isActive("/analytics") ? "active" : ""}`}>
-          📊 Analytics
-        </Link>
-        <Link to="/review" className={`nav-tab ${isActive("/review") ? "active" : ""}`}>
-          💬 Review
-        </Link>
-      </nav>
-
-      {/* Main Content */}
-      <main className="festival-content">
-        <div className="content-header">
-          <div>
-            <h2>💬 Review</h2>
-            <p className="subtitle">Share your feedback and view implemented features</p>
-          </div>
-        </div>
-
-        {/* Implemented Features */}
-        <div className="implemented-features">
-          <div className="features-header">
-            <h3 className="features-title">
-              <span className="check-icon">✅</span>
-              Implemented Features
-            </h3>
-            <div className="completion-status">16/16 Complete</div>
-          </div>
-          <div className="features-grid">
-            <div className="feature-category">
-              <h4 className="category-title">Festivals</h4>
-              <div className="feature-list">
-                <div className="feature-check-item">✅ Create festival with name, amount, dates</div>
-                <div className="feature-check-item">✅ View all festivals as cards</div>
-                <div className="feature-check-item">✅ Add organizers and incharge person</div>
-                <div className="feature-check-item">✅ Delete festivals</div>
-              </div>
-            </div>
-            <div className="feature-category">
-              <h4 className="category-title">Collections</h4>
-              <div className="feature-list">
-                <div className="feature-check-item">✅ Festival selector for collections</div>
-                <div className="feature-check-item">✅ Payment type: Cash / Online / Cheque</div>
-                <div className="feature-check-item">✅ Track collector name per payment</div>
-                <div className="feature-check-item">✅ Record family payments with mobile</div>
-                <div className="feature-check-item">✅ Show balance (green = paid, red = due)</div>
-              </div>
-            </div>
-            <div className="feature-category">
-              <h4 className="category-title">Expenses</h4>
-              <div className="feature-list">
-                <div className="feature-check-item">✅ 8 expense categories (Food, Flower, etc.)</div>
-                <div className="feature-check-item">✅ Color-coded category badges</div>
-                <div className="feature-check-item">✅ Record expenses with description & amount</div>
-              </div>
-            </div>
-            <div className="feature-category">
-              <h4 className="category-title">Analytics</h4>
-              <div className="feature-list">
-                <div className="feature-check-item">✅ Summary: Collected / Expenses / Balance</div>
-                <div className="feature-check-item">✅ Expense breakdown charts (bar + pie)</div>
-                <div className="feature-check-item">✅ Collection progress bar</div>
-                <div className="feature-check-item">✅ Share summary via WhatsApp</div>
-              </div>
+          <div className="bg-[#f8f5f0] border-l-4 border-green-500 rounded-lg p-5 shadow-sm flex items-start gap-4 opacity-80">
+            <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-bold text-gray-900 font-serif mb-1">Pooja Items Advance</h4>
+              <p className="text-sm text-gray-600 font-sans mb-2">Approved by Treasurer on 10 Oct.</p>
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-200">Cleared</span>
             </div>
           </div>
         </div>
 
-        {/* Feedback Section */}
-        <div className="feedback-section">
-          <div className="feedback-card">
-            <h3 className="feedback-title">
-              <span className="feedback-icon">💬</span>
-              Share Your Feedback
-            </h3>
-            <form onSubmit={handleSubmit} className="feedback-form">
-              <div className="form-group">
-                <label>
-                  Rate your experience *
-                  <div className="star-rating">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        className={`star-btn ${star <= rating ? 'active' : ''}`}
-                        onClick={() => setRating(star)}
-                      >
-                        ⭐
-                      </button>
-                    ))}
-                  </div>
-                </label>
-              </div>
-              <div className="form-group">
-                <label>
-                  Your comment *
-                  <textarea
-                    value={feedback}
-                    onChange={(e) => setFeedback(e.target.value)}
-                    rows={5}
-                    placeholder="Share your thoughts about the Village Festival Manager..."
-                    required
-                  />
-                </label>
-              </div>
-              <button type="submit" className="btn-save">Submit Feedback</button>
-            </form>
+        <div className="space-y-6">
+          <h3 className="text-xl font-bold font-serif text-gray-800 border-b border-gray-200 pb-2">Community Comments</h3>
+
+          <div className="bg-[#f8f5f0] rounded-lg p-5 shadow-sm border border-gray-200 relative overflow-hidden">
+            <div className="flex justify-between mb-3 border-b border-gray-200 pb-2">
+              <span className="font-bold text-gray-800 font-serif text-md">Karthik (North Street)</span>
+              <span className="text-xs text-gray-500 font-sans mt-1">2 days ago</span>
+            </div>
+            <p className="text-sm text-gray-700 font-sans leading-relaxed italic">
+              "The Annadanam arrangement last year was excellent. Please ensure we use the same caterer this year and allocate a bit more budget for sweets!"
+            </p>
           </div>
 
-          <div className="feedback-summary-card">
-            <h3 className="feedback-title">
-              <span className="feedback-icon">⭐</span>
-              Feedback Summary
-            </h3>
-            {suggestions.length === 0 ? (
-              <div className="empty-feedback">
-                <div className="empty-star-icon">⭐</div>
-                <p>No feedback yet. Be the first!</p>
-              </div>
-            ) : (
-              <div className="feedback-list">
-                {suggestions.map((suggestion) => (
-                  <div key={suggestion.id} className="feedback-item">
-                    <div className="feedback-rating">
-                      {[...Array(suggestion.rating || 0)].map((_, i) => (
-                        <span key={i}>⭐</span>
-                      ))}
-                    </div>
-                    <div className="feedback-text">{suggestion.text}</div>
-                    <div className="feedback-date">{suggestion.date}</div>
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="bg-[#f8f5f0] rounded-lg p-5 shadow-sm border border-gray-200 relative overflow-hidden">
+            <div className="flex justify-between mb-3 border-b border-gray-200 pb-2">
+              <span className="font-bold text-gray-800 font-serif text-md">Murugan Temple Committee</span>
+              <span className="text-xs text-gray-500 font-sans mt-1">5 days ago</span>
+            </div>
+            <p className="text-sm text-gray-700 font-sans leading-relaxed italic">
+              "Reminder: Collection deadline is approaching. 40 families are yet to pay the standard ₹500 amount. We will send volunteers this weekend."
+            </p>
           </div>
         </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="festival-footer">
-        <p>© 2026. Built with <span className="heart">❤</span> using caffeine.ai</p>
-      </footer>
-
-      {/* Bottom Navigation for Mobile */}
-      <BottomNav />
+      </div>
     </div>
   );
-};
-
-export default Review;
+}

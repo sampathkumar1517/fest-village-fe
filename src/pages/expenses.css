@@ -1,4 +1,56 @@
 /* Expenses page specific styles */
+.expenses-container {
+  padding: 0;
+  max-width: 100%;
+}
+
+/* Header */
+.expenses-header {
+  margin-bottom: 24px;
+}
+
+.expenses-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-family: 'Playfair Display', serif;
+}
+
+.expenses-icon {
+  width: 32px;
+  height: 32px;
+  color: #d35400;
+}
+
+.expenses-subtitle {
+  font-size: 14px;
+  color: #666;
+  font-family: 'Inter', sans-serif;
+}
+
+.expenses-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+  font-size: 16px;
+  font-family: 'Inter', sans-serif;
+  background-color: #f8f5f0;
+  border-radius: 12px;
+  margin-top: 24px;
+}
+
+.expenses-empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+}
+
 .add-expense-card {
   background-color: white;
   padding: 24px;
@@ -6,6 +58,49 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   border: 2px solid #d35400;
   margin-bottom: 24px;
+}
+
+.festival-selector-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+}
+
+.select-festival-section {
+  flex: 1;
+}
+
+.festival-select-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+  font-family: 'Inter', sans-serif;
+}
+
+.festival-select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  background-color: white;
+  color: #333;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 40px;
+}
+
+.festival-select:focus {
+  outline: none;
+  border-color: #d35400;
+  box-shadow: 0 0 0 3px rgba(211, 84, 0, 0.1);
 }
 
 .add-expense-button-wrapper {
@@ -26,13 +121,29 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  font-family: 'Inter', sans-serif;
+  white-space: nowrap;
 }
 
-.btn-add-expense:hover {
+.btn-add-expense:hover:not(:disabled) {
   background-color: #b84400;
 }
 
+.btn-add-expense:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-icon {
+  width: 16px;
+  height: 16px;
+}
+
 .expense-form-card {
+  background-color: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   margin-bottom: 30px;
 }
 
@@ -45,6 +156,82 @@
 
 .expense-form-grid .description-full {
   grid-column: 1 / -1;
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+  font-family: 'Inter', sans-serif;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  background-color: white;
+  color: #333;
+  transition: border-color 0.3s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #d35400;
+  box-shadow: 0 0 0 3px rgba(211, 84, 0, 0.1);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btn-save {
+  background-color: #d35400;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Inter', sans-serif;
+}
+
+.btn-save:hover:not(:disabled) {
+  background-color: #b84400;
+}
+
+.btn-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-cancel {
+  background-color: #f0f0f0;
+  color: #333;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+  font-family: 'Inter', sans-serif;
+}
+
+.btn-cancel:hover {
+  background-color: #e0e0e0;
 }
 
 .category-select-wrapper {
@@ -195,8 +382,6 @@
   padding: 4px 8px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 20px;
-  font-weight: 600;
   transition: all 0.3s ease;
   line-height: 1;
   width: 28px;
@@ -210,41 +395,34 @@
   background-color: #ffebee;
 }
 
+.delete-icon {
+  width: 16px;
+  height: 16px;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
-  .festival-container {
+  .expenses-container {
     padding-bottom: 70px;
   }
 
-  .festival-nav {
-    display: none;
-  }
-
-  .manage-link {
-    display: none;
-  }
-
-  .festival-content,
-  .festival-header {
-    padding: 16px;
-  }
-
-  .content-header {
-    margin-bottom: 20px;
-  }
-
-  .content-header h2 {
+  .expenses-title {
     font-size: 24px;
   }
 
-  .select-festival-card {
+  .expenses-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .add-expense-card {
     padding: 16px;
-    margin-bottom: 20px;
   }
 
   .festival-selector-row {
     flex-direction: column;
     gap: 12px;
+    align-items: stretch;
   }
 
   .festival-select {
@@ -253,12 +431,7 @@
 
   .btn-add-expense {
     width: 100%;
-  }
-
-  .summary-cards {
-    grid-template-columns: 1fr;
-    gap: 12px;
-    margin-bottom: 20px;
+    justify-content: center;
   }
 
   .category-breakdown {
@@ -289,13 +462,5 @@
   .btn-cancel {
     width: 100%;
     padding: 12px;
-  }
-
-  .empty-state {
-    padding: 40px 20px;
-  }
-
-  .festival-footer {
-    display: none;
   }
 }

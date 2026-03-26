@@ -1,0 +1,102 @@
+.layout-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background-color: #fef3e6;
+  background-image: 
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 20px,
+      rgba(211, 84, 0, 0.02) 20px,
+      rgba(211, 84, 0, 0.02) 21px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 20px,
+      rgba(211, 84, 0, 0.02) 20px,
+      rgba(211, 84, 0, 0.02) 21px
+    );
+}
+
+.layout-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.content-wrapper {
+  background: transparent;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex-grow: 1;
+  padding: 24px;
+}
+
+.layout-footer {
+  padding: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: #999;
+  border-top: 1px solid #e8d4ba;
+  background-color: #fef3e6;
+  margin-top: auto;
+}
+
+.layout-footer .heart {
+  color: #ff6b6b;
+  margin: 0 2px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .layout-container {
+    padding-bottom: 70px; /* Space for bottom nav */
+    min-height: 100vh;
+    min-height: -webkit-fill-available; /* iOS Safari fix */
+  }
+
+  .layout-content {
+    padding: 0;
+  }
+
+  .main-content {
+    padding: 16px;
+    padding-bottom: 20px; /* Extra padding for bottom nav */
+  }
+
+  .layout-footer {
+    display: none; /* Hide footer on mobile */
+  }
+}
+
+@media (max-width: 480px) {
+  .main-content {
+    padding: 12px;
+    padding-bottom: 16px;
+  }
+}
+
+/* Ensure content doesn't get hidden behind bottom nav */
+@media (max-width: 768px) {
+  .main-content {
+    margin-bottom: 0;
+  }
+  
+  /* Add safe area for devices with notches */
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .layout-container {
+      padding-bottom: calc(70px + env(safe-area-inset-bottom));
+    }
+  }
+}
