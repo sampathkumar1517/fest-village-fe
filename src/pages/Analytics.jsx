@@ -1,406 +1,430 @@
-import { useState, useEffect, useMemo } from "react";
-import { LineChart } from "lucide-react";
-import "./analytics.css";
+import { useEffect, useMemo, useState } from "react";
+import {
+  TrendingUp,
+  IndianRupee,
+  Wallet,
+  Share2,
+} from "lucide-react";
+import { toast } from "../utils/toast";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+import {
+  getFestivalsList,
+  getFestivalSummary,
+  getCollectionsByFestival,
+  getFestivalExpenses,
+} from "../utils/api";
+import FestivalSelect from "../components/FestivalSelect";
+import Spinner from "../components/Spinner";
+import EmptyState from "../components/EmptyState";
+
+const CATEGORY_COLORS = {
+  Food: "#ea580c",
+  Flower: "#db2777",
+  "Festival Items": "#ca8a04",
+  Petrol: "#64748b",
+  Dress: "#7c3aed",
+  Decoration: "#dc2626",
+  "Retail Shop": "#16a34a",
+  Others: "#6b7280",
+};
+
+function SummaryCard({ label, value, icon, color, sub }) {
+  const bg =
+    color === "jade"
+      ? "bg-green-50 border-green-100"
+      : "bg-red-50 border-red-100";
+  const iconColor = color === "jade" ? "text-green-600" : "text-red-600";
+  return (
+    <div className={`rounded-xl border p-4 ${bg}`}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+            {label}
+          </p>
+          <p className="text-2xl font-bold mt-1 text-gray-900">{value}</p>
+          {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
+        </div>
+        <div className={iconColor}>{icon}</div>
+      </div>
+    </div>
+  );
+}
 
 export default function Analytics() {
   const [festivals, setFestivals] = useState([]);
+  const [festivalsLoading, setFestivalsLoading] = useState(true);
+  const [selectedFestivalId, setSelectedFestivalId] = useState("");
+  const [summary, setSummary] = useState(null);
   const [collections, setCollections] = useState([]);
   const [expenses, setExpenses] = useState([]);
-  const [selectedFestivalId, setSelectedFestivalId] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // Load data from localStorage
   useEffect(() => {
-    const storedFestivals = JSON.parse(localStorage.getItem("festivals") || "[]");
-    const storedCollections = JSON.parse(localStorage.getItem("collections") || "[]");
-    const storedExpenses = JSON.parse(localStorage.getItem("expenses") || "[]");
-    
-    setFestivals(storedFestivals);
-    setCollections(storedCollections);
-    setExpenses(storedExpenses);
-    
-    // Don't auto-select - user must select manually
+    (async () => {
+      setFestivalsLoading(true);
+      try {
+        setFestivals(await getFestivalsList());
+      } catch (error) {
+        toast.apiError(error, "Failed to load festivals");
+      } finally {
+        setFestivalsLoading(false);
+      }
+    })();
   }, []);
 
-  // Calculate analytics for selected festival
-  const analytics = useMemo(() => {
+  const selectedFestival = festivals.find(
+    (f) => String(f.id) === String(selectedFestivalId)
+  );
+
+  useEffect(() => {
     if (!selectedFestivalId) {
-      return {
-        collected: 0,
-        expenses: 0,
-        balance: 0,
-        families: 0,
-        expected: 0,
-        familiesPaid: 0,
-        perFamilyAmount: 0,
-        expensesByCategory: {},
-        familyCollections: [],
-      };
+      setSummary(null);
+      setCollections([]);
+      setExpenses([]);
+      return;
     }
-
-    const festival = festivals.find((f) => f.id === selectedFestivalId);
-    if (!festival) {
-      return {
-        collected: 0,
-        expenses: 0,
-        balance: 0,
-        families: 0,
-        expected: 0,
-        familiesPaid: 0,
-        perFamilyAmount: 0,
-        expensesByCategory: {},
-        familyCollections: [],
-      };
-    }
-
-    // Calculate collections
-    const festivalCollections = collections.filter((c) => c.festivalId === selectedFestivalId);
-    const totalCollected = festivalCollections.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
-    const uniqueFamilies = new Set(festivalCollections.map((c) => c.familyName)).size;
-    const perFamilyAmount = parseFloat(festival.perFamilyAmount) || 0;
-    // Expected is based on families who have paid (as shown in the image)
-    const expectedAmount = perFamilyAmount * uniqueFamilies;
-
-    // Calculate expenses
-    const festivalExpenses = expenses.filter((e) => e.festivalId === selectedFestivalId);
-    const totalExpenses = festivalExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-
-    // Expenses by category
-    const expensesByCategory = {};
-    festivalExpenses.forEach((exp) => {
-      const category = exp.category || "Other";
-      expensesByCategory[category] = (expensesByCategory[category] || 0) + (parseFloat(exp.amount) || 0);
-    });
-
-    // Family collections with progress
-    const familyCollections = [];
-    const familyMap = {};
-    festivalCollections.forEach((c) => {
-      const name = c.familyName;
-      if (!familyMap[name]) {
-        familyMap[name] = { name, paid: 0, expected: perFamilyAmount };
+    (async () => {
+      setLoading(true);
+      try {
+        const [sumRes, colRes, expRes] = await Promise.all([
+          getFestivalSummary(selectedFestivalId),
+          getCollectionsByFestival(selectedFestivalId),
+          getFestivalExpenses(selectedFestivalId),
+        ]);
+        setSummary(sumRes?.data || null);
+        setCollections(Array.isArray(colRes?.data) ? colRes.data : []);
+        setExpenses(
+          Array.isArray(expRes?.data)
+            ? expRes.data
+            : Array.isArray(expRes)
+              ? expRes
+              : []
+        );
+      } catch (error) {
+        toast.apiError(error, "Failed to load analytics");
+      } finally {
+        setLoading(false);
       }
-      familyMap[name].paid += parseFloat(c.amount) || 0;
-    });
-    Object.values(familyMap).forEach((fam) => {
-      familyCollections.push(fam);
-    });
+    })();
+  }, [selectedFestivalId]);
 
-    return {
-      collected: totalCollected,
-      expenses: totalExpenses,
-      balance: totalCollected - totalExpenses,
-      families: uniqueFamilies,
-      expected: expectedAmount,
-      familiesPaid: uniqueFamilies,
-      perFamilyAmount: perFamilyAmount,
-      expensesByCategory,
-      familyCollections,
-    };
-  }, [selectedFestivalId, festivals, collections, expenses]);
-
-  const formatCurrency = (amount) => {
-    return `₹${amount.toLocaleString("en-IN")}`;
-  };
-
-  const collectionProgress = analytics.expected > 0 
-    ? Math.round((analytics.collected / analytics.expected) * 100) 
+  const totalCollected = summary ? Number(summary.totalCollected) : 0;
+  const totalExpenses = summary ? Number(summary.totalExpenses) : 0;
+  const balance = summary ? Number(summary.balance) : 0;
+  const collectionCount = summary ? Number(summary.collectionCount) : 0;
+  const perFamilyAmount = selectedFestival
+    ? Number(selectedFestival.amountPerFamily || selectedFestival.perFamilyAmount || 0)
     : 0;
+  const expectedTotal = collectionCount * perFamilyAmount || totalCollected;
+  const progressPct =
+    expectedTotal > 0
+      ? Math.min(100, Math.round((totalCollected / expectedTotal) * 100))
+      : 0;
 
-  const categoryNames = Object.keys(analytics.expensesByCategory);
-  const maxCategoryAmount = Math.max(...Object.values(analytics.expensesByCategory), 0) || 1;
-  const maxComparisonValue = Math.max(analytics.collected, analytics.expenses, Math.abs(analytics.balance)) || 1;
+  const expenseByCategory = useMemo(
+    () =>
+      Object.entries(
+        expenses.reduce((acc, e) => {
+          const name = e.category || e.categoryName || "Others";
+          acc[name] = (acc[name] || 0) + Number(e.amount || 0);
+          return acc;
+        }, {})
+      )
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value),
+    [expenses]
+  );
+
+  const familyCollections = useMemo(() => {
+    const map = {};
+    collections.forEach((c) => {
+      const name = c.familyName;
+      if (!map[name]) {
+        map[name] = {
+          name,
+          paid: 0,
+          expected: Number(c.totalAmount) || perFamilyAmount,
+        };
+      }
+      map[name].paid += Number(c.paidAmount) || 0;
+    });
+    return Object.values(map);
+  }, [collections, perFamilyAmount]);
+
+  const comparisonData = [
+    { name: "Collected", value: totalCollected, fill: "#4caf50" },
+    { name: "Expenses", value: totalExpenses, fill: "#f44336" },
+    {
+      name: "Balance",
+      value: Math.abs(balance),
+      fill: balance >= 0 ? "#4caf50" : "#f44336",
+    },
+  ];
+
+  const formatCurrency = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
   const handleShareWhatsApp = () => {
-    const festival = festivals.find((f) => f.id === selectedFestivalId);
-    if (!festival) return;
+    if (!selectedFestival || !summary) {
+      toast.error("Please select a festival first");
+      return;
+    }
+    const balanceSign = balance >= 0 ? "+" : "-";
+    const start = selectedFestival.collectionStartDate || selectedFestival.startDate;
+    const end = selectedFestival.festivalEndDate || selectedFestival.endDate;
+    const msg = `🪔 *${selectedFestival.festivalName || selectedFestival.name} — Festival Summary*
 
-    const message = `*${festival.name} - Financial Summary*\n\n` +
-      `💰 Total Collected: ${formatCurrency(analytics.collected)}\n` +
-      `💸 Total Expenses: ${formatCurrency(analytics.expenses)}\n` +
-      `📊 Balance: ${formatCurrency(analytics.balance)}\n` +
-      `👥 Families: ${analytics.families}\n\n` +
-      `Collection Progress: ${collectionProgress}%`;
+📊 *Financial Summary*
+✅ Total Collected: ${formatCurrency(totalCollected)}
+💸 Total Expenses: ${formatCurrency(totalExpenses)}
+${balance >= 0 ? "💰" : "⚠️"} Balance: ${balanceSign}${formatCurrency(Math.abs(balance))}
 
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, "_blank");
+👨‍👩‍👧‍👦 Families: ${collectionCount}
+📅 Period: ${String(start).slice(0, 10)} to ${String(end).slice(0, 10)}
+👤 Incharge: ${selectedFestival.InchargeName || selectedFestival.incharge || "—"}
+
+_Managed by Village Festival Manager_`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
   return (
-    <div className="analytics-container">
-      {/* Header */}
-      <div className="analytics-header">
-        <div>
-          <h2 className="analytics-title">
-            <LineChart className="analytics-icon" />
-            Analytics
-          </h2>
-          <p className="analytics-subtitle">Financial overview and insights</p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 font-serif flex items-center gap-2">
+          <TrendingUp className="h-6 w-6 text-[#d35400]" />
+          Analytics
+        </h1>
+        <p className="text-[#666] text-sm mt-1 font-sans">
+          Financial overview and insights
+        </p>
       </div>
 
-      {/* Festival Selector */}
-      <div className="analytics-select-card">
-        <div className="festival-select-wrapper">
-          <label className="festival-select-label">Select Festival</label>
-          <select
-            value={selectedFestivalId}
-            onChange={(e) => setSelectedFestivalId(e.target.value)}
-            className="festival-select"
-          >
-            <option value="">Choose a festival...</option>
-            {festivals.map((fest) => (
-              <option key={fest.id} value={fest.id}>
-                {fest.name}
-              </option>
-            ))}
-          </select>
+      <div className="festive-card">
+        <div className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+            <FestivalSelect
+              festivals={festivals}
+              value={selectedFestivalId}
+              onChange={setSelectedFestivalId}
+              loading={festivalsLoading}
+            />
+            {selectedFestivalId && (
+              <button
+                type="button"
+                onClick={handleShareWhatsApp}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-md text-sm font-semibold flex items-center gap-2"
+              >
+                <Share2 className="h-4 w-4" /> Share via WhatsApp
+              </button>
+            )}
+          </div>
         </div>
-        <button 
-          onClick={handleShareWhatsApp}
-          className="btn-share-whatsapp"
-          disabled={!selectedFestivalId}
-        >
-          Share via WhatsApp
-        </button>
       </div>
 
       {!selectedFestivalId ? (
-        <div className="analytics-empty">
-          <p>Please select a festival to view analytics</p>
+        <EmptyState
+          icon={<TrendingUp className="h-12 w-12" />}
+          description="Select a festival to view analytics"
+        />
+      ) : loading ? (
+        <div className="flex justify-center py-12">
+          <Spinner />
         </div>
       ) : (
-        <div className="analytics-content">
-          {/* Top Row: Collection Summary */}
-          <div className="analytics-top-row">
-            <div className="collection-summary-widget">
-              <div className="collection-summary-header">
-                <div className="collection-summary-left">
-                  <p className="collection-summary-label">Collected: {formatCurrency(analytics.collected)}</p>
-                  <p className="collection-summary-label">Expected: {formatCurrency(analytics.expected)}</p>
-                  <div className="collection-progress-bar-container">
-                    <div 
-                      className="collection-progress-bar-fill"
-                      style={{ width: `${Math.min(collectionProgress, 100)}%` }}
-                    ></div>
-                  </div>
-                  <p className="collection-progress-percent">{collectionProgress}% collected</p>
-                  <p className="collection-families-paid">{analytics.familiesPaid} families paid</p>
-                  <p className="collection-calculation">
-                    {formatCurrency(analytics.perFamilyAmount)} per family x {analytics.families} families = {formatCurrency(analytics.expected)} expected
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <SummaryCard
+              label="Total Collected"
+              value={formatCurrency(totalCollected)}
+              icon={<IndianRupee className="h-5 w-5" />}
+              color="jade"
+              sub={`${collectionCount} families`}
+            />
+            <SummaryCard
+              label="Total Expenses"
+              value={formatCurrency(totalExpenses)}
+              icon={<Wallet className="h-5 w-5" />}
+              color="crimson"
+              sub={`${expenses.length} items`}
+            />
+            <SummaryCard
+              label="Balance"
+              value={`${balance >= 0 ? "+" : ""}${formatCurrency(balance)}`}
+              icon={<TrendingUp className="h-5 w-5" />}
+              color={balance >= 0 ? "jade" : "crimson"}
+              sub={balance >= 0 ? "Surplus" : "Deficit"}
+            />
+          </div>
+
+          <div className="festive-card p-5 space-y-3">
+            <h3 className="text-base font-serif font-bold">Collection Progress</h3>
+            <div className="flex justify-between text-sm text-gray-500">
+              <span>Collected: {formatCurrency(totalCollected)}</span>
+              <span>Expected: {formatCurrency(expectedTotal)}</span>
+            </div>
+            <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#d35400] rounded-full transition-all"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="font-semibold">{progressPct}% collected</span>
+              <span className="text-gray-500">{collectionCount} families paid</span>
+            </div>
+            {perFamilyAmount > 0 && (
+              <div className="text-xs text-gray-500 bg-gray-50 rounded-md px-3 py-2">
+                {formatCurrency(perFamilyAmount)} per family × {collectionCount}{" "}
+                families = {formatCurrency(expectedTotal)} expected
+              </div>
+            )}
+          </div>
+
+          {expenseByCategory.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="festive-card p-4">
+                <h3 className="text-base font-serif font-bold mb-3">
+                  Expenses by Category
+                </h3>
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={expenseByCategory}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis
+                      dataKey="name"
+                      tick={{ fontSize: 10 }}
+                      angle={-30}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10 }}
+                      tickFormatter={(v) =>
+                        v >= 1000 ? `₹${v / 1000}k` : `₹${v}`
+                      }
+                    />
+                    <Tooltip
+                      formatter={(value) => [
+                        `₹${Number(value).toLocaleString("en-IN")}`,
+                        "Amount",
+                      ]}
+                    />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                      {expenseByCategory.map((entry) => (
+                        <Cell
+                          key={entry.name}
+                          fill={CATEGORY_COLORS[entry.name] || "#6b7280"}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="festive-card p-4">
+                <h3 className="text-base font-serif font-bold mb-3">
+                  Expense Distribution
+                </h3>
+                <ResponsiveContainer width="100%" height={240}>
+                  <PieChart>
+                    <Pie
+                      data={expenseByCategory}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label={({ name, percent }) =>
+                        `${name} ${Math.round(percent * 100)}%`
+                      }
+                    >
+                      {expenseByCategory.map((entry) => (
+                        <Cell
+                          key={entry.name}
+                          fill={CATEGORY_COLORS[entry.name] || "#6b7280"}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value) =>
+                        `₹${Number(value).toLocaleString("en-IN")}`
+                      }
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="festive-card p-4">
+              <h3 className="text-base font-serif font-bold mb-3">
+                Collection vs Expenses
+              </h3>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={comparisonData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis
+                    tick={{ fontSize: 10 }}
+                    tickFormatter={(v) =>
+                      v >= 1000 ? `₹${(v / 1000).toFixed(1)}k` : `₹${v}`
+                    }
+                  />
+                  <Tooltip
+                    formatter={(value) =>
+                      `₹${Number(value).toLocaleString("en-IN")}`
+                    }
+                  />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {comparisonData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="festive-card p-4">
+              <h3 className="text-base font-serif font-bold mb-3">
+                Family Collections
+              </h3>
+              <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+                {familyCollections.length === 0 ? (
+                  <p className="text-center text-gray-400 text-sm py-8">
+                    No collections recorded
                   </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Middle Row: Expenses by Category and Expense Distribution */}
-          <div className="analytics-middle-row">
-            {/* Expenses by Category */}
-            <div className="chart-card">
-              <h4 className="chart-title">Expenses by Category</h4>
-              <div className="category-chart-with-axis">
-                <div className="category-chart-y-axis">
-                  {[0, 1, 2, 3, 4].map((i) => {
-                    const value = Math.ceil(maxCategoryAmount / 4) * i;
-                    return (
-                      <div key={i} className="y-axis-label">
-                        ₹{value.toLocaleString("en-IN")}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="category-chart-bars">
-                  {categoryNames.length > 0 ? (
-                    categoryNames.map((category, index) => {
-                      const amount = analytics.expensesByCategory[category];
-                      const percentage = (amount / maxCategoryAmount) * 100;
-                      const colors = ["#f44336", "#2196f3", "#9e9e9e", "#ff9800", "#9c27b0"];
-                      return (
-                        <div key={category} className="category-bar-item">
-                          <div className="category-bar-container">
-                            <div
-                              className="category-bar"
-                              style={{
-                                height: `${percentage}%`,
-                                backgroundColor: colors[index % colors.length],
-                              }}
-                              title={`${category} Amount: ${formatCurrency(amount)}`}
-                            ></div>
-                          </div>
-                          <div className="category-bar-label">{category}</div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p className="chart-empty">No expenses recorded</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Expense Distribution Pie Chart */}
-            <div className="chart-card">
-              <h4 className="chart-title">Expense Distribution</h4>
-              <div className="pie-chart-container">
-                {categoryNames.length > 0 ? (
-                  <>
-                    <svg className="pie-chart-svg" viewBox="0 0 200 200">
-                      {categoryNames.map((category, index) => {
-                        const amount = analytics.expensesByCategory[category];
-                        const total = analytics.expenses;
-                        const percentage = total > 0 ? (amount / total) * 100 : 0;
-                        const colors = ["#f44336", "#2196f3", "#4caf50", "#ff9800", "#9c27b0"];
-                        const startAngle = categoryNames.slice(0, index).reduce((sum, c) => {
-                          const a = analytics.expensesByCategory[c];
-                          return sum + (total > 0 ? (a / total) * 360 : 0);
-                        }, 0);
-                        const endAngle = startAngle + (percentage * 3.6);
-                        const startAngleRad = (startAngle - 90) * (Math.PI / 180);
-                        const endAngleRad = (endAngle - 90) * (Math.PI / 180);
-                        const x1 = 100 + 100 * Math.cos(startAngleRad);
-                        const y1 = 100 + 100 * Math.sin(startAngleRad);
-                        const x2 = 100 + 100 * Math.cos(endAngleRad);
-                        const y2 = 100 + 100 * Math.sin(endAngleRad);
-                        const largeArc = percentage > 50 ? 1 : 0;
-                        const pathData = [
-                          `M 100 100`,
-                          `L ${x1} ${y1}`,
-                          `A 100 100 0 ${largeArc} 1 ${x2} ${y2}`,
-                          `Z`
-                        ].join(' ');
-                        const labelAngle = (startAngle + endAngle) / 2;
-                        const labelAngleRad = (labelAngle - 90) * (Math.PI / 180);
-                        const labelX = 100 + 70 * Math.cos(labelAngleRad);
-                        const labelY = 100 + 70 * Math.sin(labelAngleRad);
-                        return (
-                          <g key={category}>
-                            <path
-                              d={pathData}
-                              fill={colors[index % colors.length]}
-                              stroke="#fff"
-                              strokeWidth="2"
-                            />
-                            {percentage > 5 && (
-                              <text
-                                x={labelX}
-                                y={labelY}
-                                textAnchor="middle"
-                                dominantBaseline="middle"
-                                fontSize="12"
-                                fill="#fff"
-                                fontWeight="600"
-                              >
-                                {category} {Math.round(percentage)}%
-                              </text>
-                            )}
-                          </g>
-                        );
-                      })}
-                    </svg>
-                    <div className="pie-legend">
-                      {categoryNames.map((category, index) => {
-                        const amount = analytics.expensesByCategory[category];
-                        const total = analytics.expenses;
-                        const percentage = total > 0 ? Math.round((amount / total) * 100) : 0;
-                        const colors = ["#f44336", "#2196f3", "#4caf50", "#ff9800", "#9c27b0"];
-                        return (
-                          <div key={category} className="pie-legend-item">
-                            <span
-                              className="pie-legend-color"
-                              style={{ backgroundColor: colors[index % colors.length] }}
-                            ></span>
-                            <span className="pie-legend-label">{category}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
                 ) : (
-                  <p className="chart-empty">No expenses recorded</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Row: Collection vs Expenses and Family Collections */}
-          <div className="analytics-bottom-row">
-            {/* Collection vs Expenses */}
-            <div className="chart-card">
-              <h4 className="chart-title">Collection vs Expenses</h4>
-              <div className="comparison-chart-with-axis">
-                <div className="comparison-chart-y-axis">
-                  {[0, 1, 2, 3, 4].map((i) => {
-                    const value = Math.ceil(maxComparisonValue / 4) * i;
-                    const displayValue = value >= 1000 ? `₹${(value / 1000).toFixed(1)}k` : `₹${value}`;
+                  familyCollections.map((family) => {
+                    const progress =
+                      family.expected > 0
+                        ? Math.min(100, (family.paid / family.expected) * 100)
+                        : 0;
                     return (
-                      <div key={i} className="y-axis-label">
-                        {displayValue}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="comparison-chart-bars">
-                  <div className="comparison-bar-item">
-                    <div className="comparison-bar-container">
-                      <div
-                        className="comparison-bar collected-bar"
-                        style={{
-                          height: `${Math.min((analytics.collected / maxComparisonValue) * 100, 100)}%`,
-                        }}
-                      ></div>
-                    </div>
-                    <div className="comparison-bar-label">Collected</div>
-                  </div>
-                  <div className="comparison-bar-item">
-                    <div className="comparison-bar-container">
-                      <div
-                        className="comparison-bar expense-bar"
-                        style={{
-                          height: `${Math.min((analytics.expenses / maxComparisonValue) * 100, 100)}%`,
-                        }}
-                      ></div>
-                    </div>
-                    <div className="comparison-bar-label">Expenses</div>
-                  </div>
-                  <div className="comparison-bar-item">
-                    <div className="comparison-bar-container">
-                      <div
-                        className={`comparison-bar ${analytics.balance >= 0 ? "balance-bar" : "deficit-bar"}`}
-                        style={{
-                          height: `${Math.min((Math.abs(analytics.balance) / maxComparisonValue) * 100, 100)}%`,
-                        }}
-                      ></div>
-                    </div>
-                    <div className="comparison-bar-label">Balance</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Family Collections */}
-            <div className="chart-card">
-              <h4 className="chart-title">Family Collections</h4>
-              <div className="family-collections">
-                {analytics.familyCollections.length > 0 ? (
-                  analytics.familyCollections.map((family, index) => {
-                    const progress = family.expected > 0 ? (family.paid / family.expected) * 100 : 0;
-                    return (
-                      <div key={index} className="family-collection-item">
-                        <div className="family-name">{family.name}</div>
-                        <div className="family-progress-container">
+                      <div key={family.name} className="space-y-1">
+                        <div className="text-sm font-semibold">{family.name}</div>
+                        <div className="h-5 bg-gray-200 rounded-full overflow-hidden">
                           <div
-                            className="family-progress-bar"
-                            style={{ width: `${Math.min(progress, 100)}%` }}
-                          ></div>
+                            className="h-full bg-[#d35400] rounded-full"
+                            style={{ width: `${progress}%` }}
+                          />
                         </div>
-                        <div className="family-amount">
-                          {formatCurrency(family.paid)} / {formatCurrency(family.expected)}
+                        <div className="text-xs text-gray-500">
+                          {formatCurrency(family.paid)} /{" "}
+                          {formatCurrency(family.expected)}
                         </div>
                       </div>
                     );
                   })
-                ) : (
-                  <p className="chart-empty">No collections recorded</p>
                 )}
               </div>
             </div>

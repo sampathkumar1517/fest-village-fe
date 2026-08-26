@@ -1,16 +1,77 @@
-# React + Vite
+# Village Festival Manager — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Vite + React SPA that recreates [Village Festival Manager](https://village-festival-manager-kte.caffeine.xyz/) against the NestJS backend.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- React 18 + Vite 7
+- Tailwind CSS 4
+- react-router-dom 7
+- axios
+- lucide-react
+- sonner (toasts)
+- recharts (analytics)
 
-## React Compiler
+## Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Copy env:
 
-## Expanding the ESLint configuration
+```bash
+cp .env.example .env
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+| Variable | Description |
+|----------|-------------|
+| `VITE_API_URL` | Backend base URL (default `http://localhost:3000`) |
+
+2. Install and run (backend must be running):
+
+```bash
+npm install
+npm run dev
+```
+
+App: `http://localhost:5173`
+
+## Pages / routes
+
+| Route | Page |
+|-------|------|
+| `/` , `/festival` | Festivals — create / list / delete cards |
+| `/collection` | Collections — family payments |
+| `/expenses` | Expenses — category totals + list |
+| `/analytics` | Analytics — summary, charts, WhatsApp share |
+| `/review` | Review — feature checklist + star feedback |
+| `/users` | Users directory (extra) |
+| `/login` | Login (extra) |
+| `/register` | Register (extra) |
+
+Core tabs match the reference UI. Users and Login/Register are kept as extras.
+
+## Design tokens
+
+- Background cream `#FFFBEB` with dotted grid
+- Primary saffron `#d35400`
+- Fonts: Playfair Display (headings), Inter (body)
+- Cards: white with orange top border (`.festive-card`)
+- Max content width: `max-w-5xl`
+- Desktop top nav + mobile bottom nav
+
+## Build
+
+```bash
+npm run build
+npm run preview
+```
+
+## Manual test checklist
+
+- [ ] Create / delete festival
+- [ ] Record collection (family name + 10-digit mobile, Cash/Online/Cheque)
+- [ ] Delete collection; Paid/Due status
+- [ ] Add / delete expense; category chips
+- [ ] Analytics summary + WhatsApp share
+- [ ] Submit / delete feedback
+- [ ] Users CRUD + phone search
+- [ ] Login redirects to `/`
+- [ ] Mobile bottom nav + desktop tabs

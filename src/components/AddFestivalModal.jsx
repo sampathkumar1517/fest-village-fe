@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFestival } from "../utils/api";
-
+import { toast } from "../utils/toast";
 
 export default function AddFestivalModal({ onClose, onCreated }) {
     const [form, setForm] = useState({
@@ -23,7 +23,7 @@ export default function AddFestivalModal({ onClose, onCreated }) {
         e.preventDefault();
 
         if (!form.name.trim() || !form.perFamilyAmount.trim() || !form.startDate || !form.endDate) {
-            alert("Please fill all required fields (Festival, Amount, Dates).");
+            toast.error("Please fill all required fields (Festival, Amount, Dates).");
             return;
         }
 
@@ -46,10 +46,11 @@ export default function AddFestivalModal({ onClose, onCreated }) {
                 onCreated(response.data);
             }
 
+            toast.success(`Festival "${form.name}" created successfully!`);
             onClose();
         } catch (error) {
             console.error("Error creating festival:", error);
-            alert("Failed to create festival. Please try again.");
+            toast.apiError(error, "Failed to create festival. Please try again.");
         } finally {
             setIsSubmitting(false);
         }

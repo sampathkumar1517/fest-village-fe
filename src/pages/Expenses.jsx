@@ -1,299 +1,342 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Plus, Trash2 } from "lucide-react";
-import "./expenses.css";
+import { ShoppingBag, Plus, Trash2 } from "lucide-react";
+import { toast } from "../utils/toast";
+import {
+  getFestivalsList,
+  getFestivalExpenses,
+  createExpense,
+  deleteExpense,
+} from "../utils/api";
+import FestivalSelect from "../components/FestivalSelect";
+import Spinner from "../components/Spinner";
+import EmptyState from "../components/EmptyState";
+import { useConfirm } from "../components/ConfirmDialog";
 
-const CATEGORIES = [
-  "Food",
-  "Flower",
-  "Festival Things",
-  "Petrol",
-  "Dress",
-  "Decoration",
-  "Retail Shop",
-  "Other",
+export const EXPENSE_CATEGORIES = [
+  { label: "Food", value: "Food", icon: "🍜", color: "bg-orange-100 text-orange-800 border-orange-200" },
+  { label: "Flower", value: "Flower", icon: "🌸", color: "bg-pink-100 text-pink-800 border-pink-200" },
+  { label: "Festival Items", value: "Festival Items", icon: "🪔", color: "bg-yellow-100 text-yellow-800 border-yellow-200" },
+  { label: "Petrol", value: "Petrol", icon: "⛽", color: "bg-slate-100 text-slate-700 border-slate-200" },
+  { label: "Dress", value: "Dress", icon: "👘", color: "bg-purple-100 text-purple-800 border-purple-200" },
+  { label: "Decoration", value: "Decoration", icon: "🎉", color: "bg-red-100 text-red-800 border-red-200" },
+  { label: "Retail Shop", value: "Retail Shop", icon: "🏪", color: "bg-green-100 text-green-800 border-green-200" },
+  { label: "Others", value: "Others", icon: "📦", color: "bg-gray-100 text-gray-700 border-gray-200" },
 ];
 
+const getCategoryStyle = (category) =>
+  EXPENSE_CATEGORIES.find((c) => c.value === category) || EXPENSE_CATEGORIES[7];
+
+const initialForm = {
+  category: "Food",
+  description: "",
+  amount: "",
+};
+
 export default function Expenses() {
+  const confirm = useConfirm();
   const [festivals, setFestivals] = useState([]);
-  const [expenses, setExpenses] = useState([]);
+  const [festivalsLoading, setFestivalsLoading] = useState(true);
   const [selectedFestivalId, setSelectedFestivalId] = useState("");
-  const [form, setForm] = useState({
-    date: "",
-    description: "",
-    category: "Food",
-    amount: "",
-  });
+  const [expenses, setExpenses] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(initialForm);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const storedFestivals = JSON.parse(localStorage.getItem("festivals") || "[]");
-    const storedExpenses = JSON.parse(localStorage.getItem("expenses") || "[]");
-
-    setFestivals(storedFestivals);
-    setExpenses(storedExpenses);
-    
-    // Don't auto-select - user must select manually
+    (async () => {
+      setFestivalsLoading(true);
+      try {
+        setFestivals(await getFestivalsList());
+      } catch (error) {
+        toast.apiError(error, "Failed to load festivals");
+      } finally {
+        setFestivalsLoading(false);
+      }
+    })();
   }, []);
 
-  const festivalExpenses = useMemo(() => {
-    if (!selectedFestivalId) return [];
-    return expenses.filter((e) => e.festivalId === selectedFestivalId);
-  }, [expenses, selectedFestivalId]);
+  const selectedFestival = festivals.find(
+    (f) => String(f.id) === String(selectedFestivalId)
+  );
 
-  const totals = useMemo(() => {
-    const total = festivalExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-
-    const byCategory = {};
-    festivalExpenses.forEach((e) => {
-      const cat = e.category || "Other";
-      byCategory[cat] = (byCategory[cat] || 0) + (parseFloat(e.amount) || 0);
-    });
-
-    return { total, byCategory };
-  }, [festivalExpenses]);
-
-  const formatCurrency = (amount) => `₹${amount.toLocaleString("en-IN")}`;
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+  const fetchExpenses = async (festivalId) => {
+    if (!festivalId) {
+      setExpenses([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await getFestivalExpenses(festivalId);
+      const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+      setExpenses(list);
+    } catch (error) {
+      toast.apiError(error, "Failed to load expenses");
+      setExpenses([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleAddExpense = (e) => {
+  useEffect(() => {
+    setShowForm(false);
+    setForm(initialForm);
+    fetchExpenses(selectedFestivalId);
+  }, [selectedFestivalId]);
+
+  const totalExpenses = useMemo(
+    () => expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0),
+    [expenses]
+  );
+
+  const categoryTotals = useMemo(
+    () =>
+      EXPENSE_CATEGORIES.map((cat) => ({
+        ...cat,
+        total: expenses
+          .filter((e) => (e.category || e.categoryName) === cat.value)
+          .reduce((sum, e) => sum + (Number(e.amount) || 0), 0),
+      })).filter((c) => c.total > 0),
+    [expenses]
+  );
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedFestivalId) return;
-
-    if (!form.date || !form.description.trim() || !form.amount.trim()) {
-      alert("Please fill date, description and amount.");
+    if (!selectedFestivalId) {
+      toast.error("Please select a festival first");
       return;
     }
-
-    const amount = parseFloat(form.amount);
+    if (!form.description || !form.amount) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+    const amount = Number(form.amount);
     if (Number.isNaN(amount) || amount <= 0) {
-      alert("Enter a valid amount.");
+      toast.error("Enter a valid amount");
       return;
     }
 
-    const existing = JSON.parse(localStorage.getItem("expenses") || "[]");
-    const newExpense = {
-      id: `exp_${Date.now()}`,
-      festivalId: selectedFestivalId,
-      date: form.date,
-      description: form.description.trim(),
-      category: form.category,
-      amount,
-      createdAt: new Date().toISOString(),
-    };
-
-    const updated = [...existing, newExpense];
-    localStorage.setItem("expenses", JSON.stringify(updated));
-    setExpenses(updated);
-
-    setForm((prev) => ({
-      ...prev,
-      date: "",
-      description: "",
-      amount: "",
-    }));
+    setIsSubmitting(true);
+    try {
+      await createExpense({
+        festivalId: parseInt(selectedFestivalId, 10),
+        category: form.category,
+        description: form.description.trim(),
+        amount,
+      });
+      toast.success("Expense recorded");
+      setForm(initialForm);
+      setShowForm(false);
+      await fetchExpenses(selectedFestivalId);
+    } catch (error) {
+      toast.apiError(error, "Failed to record expense");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDelete = (id) => {
-    if (!window.confirm("Delete this expense?")) return;
-    const updated = expenses.filter((e) => e.id !== id);
-    localStorage.setItem("expenses", JSON.stringify(updated));
-    setExpenses(updated);
+  const handleDelete = async (expense) => {
+    const ok = await confirm({
+      title: "Delete expense?",
+      message: `Delete expense "${expense.description}"? This cannot be undone.`,
+      confirmLabel: "Delete",
+      cancelLabel: "Cancel",
+    });
+    if (!ok) return;
+    try {
+      await deleteExpense(expense.id);
+      toast.success("Expense deleted");
+      setExpenses((prev) => prev.filter((e) => e.id !== expense.id));
+    } catch (error) {
+      toast.apiError(error, "Failed to delete expense");
+    }
   };
 
-  const selectedFestival = festivals.find((f) => f.id === selectedFestivalId);
+  const formatCurrency = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
   return (
-    <div className="expenses-container">
-      {/* Header */}
-      <div className="expenses-header">
-        <div>
-          <h2 className="expenses-title">
-            <FileText className="expenses-icon" />
-            Expenses
-          </h2>
-          <p className="expenses-subtitle">Manage all village festival expenses</p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 font-serif flex items-center gap-2">
+          <ShoppingBag className="h-6 w-6 text-[#d35400]" />
+          Expenses
+        </h1>
+        <p className="text-[#666] text-sm mt-1 font-sans">
+          Record and track festival expenses
+        </p>
       </div>
 
-      {/* Festival select + add */}
-      <div className="add-expense-card">
-        <div className="festival-selector-row">
-          <div className="select-festival-section">
-            <label className="festival-select-label">Select Festival</label>
-            <select
+      <div className="festive-card">
+        <div className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+            <FestivalSelect
+              festivals={festivals}
               value={selectedFestivalId}
-              onChange={(e) => setSelectedFestivalId(e.target.value)}
-              className="festival-select"
-            >
-              <option value="">Choose a festival...</option>
-              {festivals.map((fest) => (
-                <option key={fest.id} value={fest.id}>
-                  {fest.name}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedFestivalId}
+              loading={festivalsLoading}
+            />
+            {selectedFestivalId && (
+              <button
+                type="button"
+                onClick={() => setShowForm(!showForm)}
+                className="bg-[#d35400] hover:bg-[#b84400] text-white px-4 py-2.5 rounded-md text-sm font-semibold flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" /> Add Expense
+              </button>
+            )}
           </div>
-          <div className="add-expense-button-wrapper">
-            <button
-              className="btn-add-expense"
-              onClick={() => {
-                if (!selectedFestivalId) {
-                  alert("Please select a festival first");
-                  return;
-                }
-                // Form will be shown below
-              }}
-              disabled={!selectedFestivalId}
-              type="button"
-            >
-              <Plus className="btn-icon" /> Add Expense
-            </button>
-          </div>
+          {selectedFestival && expenses.length > 0 && (
+            <div className="mt-4 flex items-center justify-between rounded-lg bg-red-50 px-4 py-3">
+              <span className="text-sm font-medium">
+                Total Expenses — {selectedFestival.festivalName || selectedFestival.name}
+              </span>
+              <span className="text-xl font-bold balance-negative">
+                {formatCurrency(totalExpenses)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Expense form - only show when festival is selected */}
-      {selectedFestivalId ? (
-        <div className="expense-form-card">
-          <form onSubmit={handleAddExpense}>
-            <div className="expense-form-grid">
-              <div>
-                <label className="form-label">Date *</label>
-                <input
-                  type="date"
-                  name="date"
-                  value={form.date}
-                  onChange={handleChange}
-                  className="form-input"
-                  required
-                />
+      {showForm && selectedFestival && (
+        <div className="festive-card shadow-md">
+          <div className="p-4 pb-2">
+            <h2 className="text-lg font-serif font-bold flex items-center gap-2">
+              <span>🧾</span> Record Expense
+            </h2>
+          </div>
+          <form onSubmit={handleSubmit} className="p-4 pt-2 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Category *</label>
+                <select
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-[#d35400]"
+                >
+                  {EXPENSE_CATEGORIES.map((cat) => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.icon} {cat.label}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div>
-                <label className="form-label">Category</label>
-                <div className="category-select-wrapper">
-                  <select
-                    name="category"
-                    value={form.category}
-                    onChange={handleChange}
-                    className="category-select"
-                  >
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="description-full">
-                <label className="form-label">Description *</label>
-                <input
-                  type="text"
-                  name="description"
-                  value={form.description}
-                  onChange={handleChange}
-                  placeholder="e.g., Annadanam, flower decoration, petrol for van..."
-                  className="form-input"
-                  required
-                />
-              </div>
-              <div>
-                <label className="form-label">Amount (₹) *</label>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Amount (₹) *</label>
                 <input
                   type="number"
-                  name="amount"
-                  value={form.amount}
-                  onChange={handleChange}
-                  min="0"
-                  step="1"
-                  placeholder="e.g., 2500"
-                  className="form-input"
+                  min="1"
                   required
+                  placeholder="e.g., 1500"
+                  value={form.amount}
+                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-[#d35400]"
+                />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-sm font-medium">Description *</label>
+                <input
+                  required
+                  placeholder="e.g., Prasadam food for 200 people"
+                  value={form.description}
+                  onChange={(e) =>
+                    setForm({ ...form, description: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-[#d35400]"
                 />
               </div>
             </div>
-            <div className="form-actions">
+            <div className="flex gap-3 justify-end border-t border-gray-100 pt-4">
               <button
                 type="button"
-                className="btn-cancel"
                 onClick={() => {
-                  setForm({
-                    date: "",
-                    description: "",
-                    category: "Food",
-                    amount: "",
-                  });
+                  setShowForm(false);
+                  setForm(initialForm);
                 }}
+                className="px-5 py-2 border border-gray-300 rounded-md text-sm"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="btn-save"
-                disabled={!selectedFestivalId}
+                disabled={isSubmitting}
+                className="px-5 py-2 bg-[#d35400] text-white rounded-md text-sm font-medium disabled:opacity-70"
               >
-                <Plus className="btn-icon" /> Save Expense
+                {isSubmitting ? "Saving..." : "Save Expense"}
               </button>
             </div>
           </form>
         </div>
+      )}
+
+      {!selectedFestivalId ? (
+        <EmptyState
+          icon={<ShoppingBag className="h-12 w-12" />}
+          description="Select a festival to view expenses"
+        />
+      ) : loading ? (
+        <div className="flex justify-center py-12">
+          <Spinner />
+        </div>
       ) : (
-        <div className="expenses-empty">
-          <p>Please select a festival to manage expenses</p>
-        </div>
-      )}
-
-      {/* Category breakdown - only show when festival is selected and has expenses */}
-      {selectedFestivalId && festivalExpenses.length > 0 && (
-        <div className="category-breakdown">
-          <h3>Expenses by Category</h3>
-          <div className="category-list">
-            {Object.entries(totals.byCategory).map(([cat, amt]) => (
-              <div key={cat} className="category-item">
-                <span className="category-name">{cat}</span>
-                <span className="category-amount">{formatCurrency(amt)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Expense cards list - only show when festival is selected */}
-      {selectedFestivalId ? (
-        <div className="expenses-list-container">
-          <h3>All Expenses — {selectedFestival?.name || "Festival"}</h3>
-          {festivalExpenses.length === 0 ? (
-            <div className="expenses-empty-state">
-              <p>No expenses recorded yet for this festival.</p>
-            </div>
-          ) : (
-            <div className="expenses-grid">
-              {festivalExpenses.map((exp) => (
-                <div key={exp.id} className="expense-card">
-                  <div className="expense-header">
-                    <span className="expense-category">{exp.category}</span>
-                    <button
-                      className="btn-delete-small"
-                      onClick={() => handleDelete(exp.id)}
-                      title="Delete expense"
-                    >
-                      <Trash2 className="delete-icon" />
-                    </button>
-                  </div>
-                  <div className="expense-description">{exp.description}</div>
-                  <div className="expense-footer">
-                    <div className="expense-amount">{formatCurrency(exp.amount)}</div>
-                    <div className="expense-date">{exp.date}</div>
+        <>
+          {categoryTotals.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {categoryTotals.map((cat) => (
+                <div
+                  key={cat.value}
+                  className="bg-white rounded-xl border border-[#f0e0c8] p-4 text-center shadow-sm"
+                >
+                  <div className="text-2xl mb-1">{cat.icon}</div>
+                  <div className="text-sm font-medium text-gray-700">{cat.label}</div>
+                  <div className="text-lg font-bold text-[#d35400] mt-1">
+                    {formatCurrency(cat.total)}
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
-      ) : null}
+
+          {expenses.length === 0 ? (
+            <EmptyState description="No expenses recorded yet for this festival." />
+          ) : (
+            <div className="space-y-3">
+              {expenses.map((expense) => {
+                const style = getCategoryStyle(
+                  expense.category || expense.categoryName
+                );
+                return (
+                  <div
+                    key={expense.id}
+                    className="bg-white rounded-xl border border-[#eeeeee] p-4 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    <div className="text-xl">{style.icon}</div>
+                    <span
+                      className={`text-xs font-bold px-2.5 py-1 rounded-md border ${style.color}`}
+                    >
+                      {expense.category || expense.categoryName}
+                    </span>
+                    <div className="flex-1 min-w-0 font-medium text-gray-800 truncate">
+                      {expense.description}
+                    </div>
+                    <div className="text-lg font-bold text-[#d35400] whitespace-nowrap">
+                      {formatCurrency(expense.amount)}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(expense)}
+                      className="text-gray-400 hover:text-red-500 p-1.5"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

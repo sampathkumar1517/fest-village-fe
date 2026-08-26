@@ -1,440 +1,432 @@
-import { useState, useEffect, useMemo } from "react";
-import { IndianRupee, Phone, Plus, Trash2, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react";
-import "./collection.css";
-import { getFestivals, AddPayment } from "../utils/api";
+import { useEffect, useMemo, useState } from "react";
+import {
+  IndianRupee,
+  Plus,
+  Trash2,
+  Phone,
+  CheckCircle,
+  AlertCircle,
+  Users,
+} from "lucide-react";
+import { toast } from "../utils/toast";
+import {
+  getFestivalsList,
+  getCollectionsByFestival,
+  createCollection,
+  deleteCollection,
+} from "../utils/api";
+import FestivalSelect from "../components/FestivalSelect";
+import Spinner from "../components/Spinner";
+import EmptyState from "../components/EmptyState";
+import { useConfirm } from "../components/ConfirmDialog";
+
+const PAYMENT_TYPES = ["Cash", "Online", "Cheque"];
+
+const initialForm = {
+  familyName: "",
+  mobileNumber: "",
+  paidAmount: "",
+  paymentType: "Cash",
+  collectorName: "",
+};
+
+const typeBadge = {
+  Cash: "bg-green-100 text-green-800 border-green-200",
+  Online: "bg-blue-100 text-blue-700 border-blue-200",
+  Cheque: "bg-amber-100 text-amber-800 border-amber-200",
+};
 
 export default function Collection() {
+  const confirm = useConfirm();
   const [festivals, setFestivals] = useState([]);
-  const [collections, setCollections] = useState([]);
+  const [festivalsLoading, setFestivalsLoading] = useState(true);
   const [selectedFestivalId, setSelectedFestivalId] = useState("");
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newPayment, setNewPayment] = useState({
-    familyName: "",
-    mobile: "",
-    amount: "",
-    paymentType: "Cash",
-    collector: "",
-  });
+  const [collections, setCollections] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(initialForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load data from localStorage and API
   useEffect(() => {
-    const storedCollections = JSON.parse(localStorage.getItem("collections") || "[]");
-    setCollections(storedCollections);
-
-    const fetchFestivals = async () => {
+    (async () => {
+      setFestivalsLoading(true);
       try {
-        const response = await getFestivals();
-        if (response && response.listData && response.listData.length > 0) {
-          setFestivals(response.listData[0].data || []);
-        } else {
-          setFestivals([]);
-        }
+        setFestivals(await getFestivalsList());
       } catch (error) {
-        console.error("Failed to fetch festivals:", error);
+        toast.apiError(error, "Failed to load festivals");
+      } finally {
+        setFestivalsLoading(false);
       }
-    };
-    
-    fetchFestivals();
+    })();
   }, []);
 
-  // Get collections for selected festival
-  const festivalCollections = useMemo(() => {
-    if (!selectedFestivalId) return [];
-    return collections.filter((c) => c.festivalId === selectedFestivalId);
-  }, [selectedFestivalId, collections]);
+  const selectedFestival = festivals.find(
+    (f) => String(f.id) === String(selectedFestivalId)
+  );
 
-  // Calculate summary metrics
+  const fetchCollections = async (festivalId) => {
+    if (!festivalId) {
+      setCollections([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await getCollectionsByFestival(festivalId);
+      setCollections(Array.isArray(res?.data) ? res.data : []);
+    } catch (error) {
+      toast.apiError(error, "Failed to load collections");
+      setCollections([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setShowForm(false);
+    setForm(initialForm);
+    fetchCollections(selectedFestivalId);
+  }, [selectedFestivalId]);
+
   const summary = useMemo(() => {
-    if (!selectedFestivalId) {
-      return { families: 0, collected: 0, balance: 0 };
-    }
-
-    const festival = festivals.find((f) => String(f.id) === String(selectedFestivalId));
-    if (!festival) {
-      return { families: 0, collected: 0, balance: 0 };
-    }
-
-    const uniqueFamilies = new Set(festivalCollections.map((c) => c.familyName)).size;
-    const totalCollected = festivalCollections.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
-    const perFamilyAmount = parseFloat(festival.amountPerFamily) || 0;
-    const expectedAmount = perFamilyAmount * uniqueFamilies;
-    const balance = expectedAmount - totalCollected;
-
+    const totalPaid = collections.reduce(
+      (sum, c) => sum + (Number(c.paidAmount) || 0),
+      0
+    );
+    const totalBalance = collections.reduce((sum, c) => {
+      const total = Number(c.totalAmount) || 0;
+      const paid = Number(c.paidAmount) || 0;
+      return sum + Math.max(0, total - paid);
+    }, 0);
     return {
-      families: uniqueFamilies,
-      collected: totalCollected,
-      balance: balance,
+      families: collections.length,
+      collected: totalPaid,
+      balance: totalBalance,
     };
-  }, [selectedFestivalId, festivals, festivalCollections]);
+  }, [collections]);
 
-  // Calculate balance for each family
-  const getFamilyBalance = (familyName) => {
-    const festival = festivals.find((f) => String(f.id) === String(selectedFestivalId));
-    if (!festival) return 0;
-    
-    const perFamilyAmount = parseFloat(festival.amountPerFamily) || 0;
-    const familyPayments = festivalCollections.filter((c) => c.familyName === familyName);
-    const totalPaid = familyPayments.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
-    return Math.max(0, perFamilyAmount - totalPaid);
-  };
-
-  // Get total paid for a family
-  const getFamilyPaid = (familyName) => {
-    const familyPayments = festivalCollections.filter((c) => c.familyName === familyName);
-    return familyPayments.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
-  };
-
-  // Get status for a family
-  const getFamilyStatus = (familyName) => {
-    const balance = getFamilyBalance(familyName);
-    return balance === 0 ? "Paid" : "Due";
-  };
-
-  // Delete collection
-  const handleDelete = (collectionId) => {
-    if (window.confirm("Are you sure you want to delete this payment record?")) {
-      const updatedCollections = collections.filter((c) => c.id !== collectionId);
-      setCollections(updatedCollections);
-      localStorage.setItem("collections", JSON.stringify(updatedCollections));
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedFestivalId) {
+      toast.error("Please select a festival first");
+      return;
     }
-  };
-
-  // Calculate per-family totals for display
-  const familyTotals = useMemo(() => {
-    const totals = {};
-    festivalCollections.forEach((collection) => {
-      const familyName = collection.familyName;
-      if (!totals[familyName]) {
-        totals[familyName] = {
-          name: familyName,
-          mobile: collection.mobile || "",
-          totalPaid: 0,
-          paymentType: collection.paymentType || "Cash",
-          collector: collection.collector || "",
-          collections: [],
-        };
-      }
-      totals[familyName].totalPaid += parseFloat(collection.amount) || 0;
-      totals[familyName].collections.push(collection);
-    });
-    return Object.values(totals);
-  }, [festivalCollections]);
-
-  const formatCurrency = (amount) => {
-    return `₹${amount.toLocaleString("en-IN")}`;
-  };
-
-  const selectedFestival = festivals.find((f) => String(f.id) === String(selectedFestivalId));
-
-  const handleOpenAddPayment = () => {
-    setNewPayment({
-      familyName: "",
-      mobile: "",
-      amount: "",
-      paymentType: "Cash",
-      collector: "",
-    });
-    setIsAddModalOpen(true);
-  };
-
-  const handlePaymentChange = (e) => {
-    const { name, value } = e.target;
-    setNewPayment((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleAddPayment = async (e) => {
-    // 1. Prevent the default browser form submission
-    if (e && e.preventDefault) e.preventDefault();
-
-    const amount = parseFloat(newPayment.amount);
-    if (Number.isNaN(amount) || amount <= 0) {
-      alert("Please enter a valid amount.");
+    if (!form.familyName || !form.mobileNumber || !form.paidAmount) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+    if (!/^[0-9]{10}$/.test(form.mobileNumber)) {
+      toast.error("Mobile number must be 10 digits");
+      return;
+    }
+    const paid = Number(form.paidAmount);
+    if (Number.isNaN(paid) || paid <= 0) {
+      toast.error("Enter a valid paid amount");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // 2. Format the payload to exactly match your backend API
-      const apiPayload = {
-        userId: 1, // NOTE: You may need to dynamically fetch or pass the correct user ID here
+      await createCollection({
         festivalId: parseInt(selectedFestivalId, 10),
-        paidAmount: amount,
-        paymentStatus: "PENDING",
-        paymentMethod: newPayment.paymentType.toUpperCase(), // Converts "Cash" to "CASH"
-        paymentDate: new Date().toISOString().split("T")[0], // Gets "YYYY-MM-DD" formatted date
-        collectedBy: newPayment.collector.trim() || "Admin User"
-      };
-
-      // 3. Make the actual API call
-      const response = await AddPayment(apiPayload);
-      
-      // 4. Update the local React state
-      // We map the data back to the fields your table UI currently expects (amount, familyName, etc.)
-      const newPaymentData = {
-        id: response?.data?.id || `col_${Date.now()}`,
-        festivalId: selectedFestivalId,
-        familyName: newPayment.familyName.trim(),
-        mobile: newPayment.mobile.trim(),
-        amount: apiPayload.paidAmount,
-        paymentType: newPayment.paymentType,
-        collector: apiPayload.collectedBy,
-      };
-
-      const updated = [...collections, newPaymentData];
-      setCollections(updated);
-
-      // Keep localStorage in sync (optional, as fallback)
-      localStorage.setItem("collections", JSON.stringify(updated));
-      
-      // 5. Success! Close the modal
-      setIsAddModalOpen(false);
+        familyName: form.familyName.trim(),
+        mobileNumber: form.mobileNumber.trim(),
+        paidAmount: paid,
+        paymentType: form.paymentType,
+        collectorName: form.collectorName.trim(),
+      });
+      const perFamily = Number(
+        selectedFestival?.amountPerFamily || selectedFestival?.perFamilyAmount || 0
+      );
+      const balance = perFamily - paid;
+      toast.success(
+        balance > 0
+          ? `Payment recorded. Balance: ₹${balance.toLocaleString("en-IN")}`
+          : "Full payment recorded!"
+      );
+      setForm(initialForm);
+      setShowForm(false);
+      await fetchCollections(selectedFestivalId);
     } catch (error) {
-      // 6. Provide clear error feedback if the API fails
-      console.error("Error adding payment:", error);
-      alert("Failed to add payment. Please try again.");
+      toast.apiError(error, "Failed to record payment");
     } finally {
-      // 7. Always reset the submitting button state
       setIsSubmitting(false);
     }
   };
-  
+
+  const handleDelete = async (c) => {
+    const ok = await confirm({
+      title: "Delete payment?",
+      message: `Delete payment for "${c.familyName}"? This cannot be undone.`,
+      confirmLabel: "Delete",
+      cancelLabel: "Cancel",
+    });
+    if (!ok) return;
+    try {
+      await deleteCollection(c.id);
+      toast.success("Record deleted");
+      setCollections((prev) => prev.filter((x) => x.id !== c.id));
+    } catch (error) {
+      toast.apiError(error, "Failed to delete record");
+    }
+  };
+
+  const formatCurrency = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
   return (
-    <div className="collection-container">
-      {/* Header */}
-      <div className="collection-header">
-        <div>
-          <h2 className="collection-title">
-            <IndianRupee className="collection-icon" />
-            Collections
-          </h2>
-          <p className="collection-subtitle">Track family payments for each festival</p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 font-serif flex items-center gap-2">
+          <IndianRupee className="h-6 w-6 text-[#d35400]" />
+          Collections
+        </h1>
+        <p className="text-[#666] text-sm mt-1 font-sans">
+          Track family payments for each festival
+        </p>
       </div>
 
-      {/* Summary Card */}
-      <div className="collection-summary-card">
-        <div className="summary-card-header">
-          <div>
-            <h3 className="summary-card-title">
-              <ArrowLeft className="back-icon" />
-              Collections
-            </h3>
-            <p className="summary-card-subtitle">Track family payments for each festival</p>
-          </div>
-        </div>
-
-        <div className="summary-card-content">
-          <div className="festival-select-section">
-            <label className="festival-select-label">Select Festival</label>
-            <select
+      <div className="festive-card">
+        <div className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+            <FestivalSelect
+              festivals={festivals}
               value={selectedFestivalId}
-              onChange={(e) => setSelectedFestivalId(e.target.value)}
-              className="festival-select"
-            >
-              <option value="">Choose a festival...</option>
-              {festivals.map((fest) => (
-                <option key={fest.id} value={fest.id}>
-                  {fest.festivalName}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedFestivalId}
+              loading={festivalsLoading}
+            />
+            {selectedFestivalId && (
+              <button
+                type="button"
+                onClick={() => setShowForm(!showForm)}
+                className="bg-[#d35400] hover:bg-[#b84400] text-white px-4 py-2.5 rounded-md text-sm font-semibold flex items-center gap-2 whitespace-nowrap"
+              >
+                <Plus className="h-4 w-4" /> Add Payment
+              </button>
+            )}
           </div>
 
-          {selectedFestivalId && (
-            <div className="summary-metrics">
-              <div className="metric-box">
-                <div className="metric-label">Families</div>
-                <div className="metric-value">{summary.families}</div>
+          {selectedFestival && collections.length > 0 && (
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              <div className="rounded-lg bg-gray-100 p-3 text-center">
+                <div className="text-xs text-gray-500">Families</div>
+                <div className="text-lg font-bold">{summary.families}</div>
               </div>
-              <div className="metric-box collected">
-                <div className="metric-label">Collected</div>
-                <div className="metric-value">{formatCurrency(summary.collected)}</div>
+              <div className="rounded-lg bg-green-50 p-3 text-center">
+                <div className="text-xs text-gray-500">Collected</div>
+                <div className="text-lg font-bold balance-positive">
+                  {formatCurrency(summary.collected)}
+                </div>
               </div>
-              <div className="metric-box balance">
-                <div className="metric-label">Balance</div>
-                <div className="metric-value">{formatCurrency(summary.balance)}</div>
+              <div className="rounded-lg bg-red-50 p-3 text-center">
+                <div className="text-xs text-gray-500">Balance</div>
+                <div className="text-lg font-bold balance-negative">
+                  {formatCurrency(summary.balance)}
+                </div>
               </div>
             </div>
           )}
-
-          <button
-            onClick={handleOpenAddPayment}
-            className="btn-add-payment"
-            disabled={!selectedFestivalId}
-          >
-            <Plus className="btn-icon" />
-            Add Payment
-          </button>
         </div>
       </div>
 
-      {/* Payment Records Table */}
-      {selectedFestivalId && festivalCollections.length > 0 ? (
-        <div className="payment-records-card">
-          <h3 className="records-title">
-            Payment Records — {selectedFestival?.festivalName || "Festival"}
-          </h3>
-          <div className="table-wrapper">
-            <table className="payment-records-table">
+      {showForm && selectedFestival && (
+        <div className="festive-card shadow-md">
+          <div className="p-4 pb-2 flex items-center gap-2">
+            <span>💰</span>
+            <h2 className="text-lg font-serif font-bold">Record Family Payment</h2>
+            <span className="ml-auto text-xs border border-gray-200 rounded-full px-2.5 py-1 text-gray-600">
+              Per Family: ₹
+              {Number(
+                selectedFestival.amountPerFamily ||
+                  selectedFestival.perFamilyAmount ||
+                  0
+              ).toLocaleString("en-IN")}
+            </span>
+          </div>
+          <form onSubmit={handleSubmit} className="p-4 pt-2 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Family Name *</label>
+                <input
+                  required
+                  placeholder="e.g., Rajan Family"
+                  value={form.familyName}
+                  onChange={(e) =>
+                    setForm({ ...form, familyName: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-[#d35400]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Mobile Number *</label>
+                <input
+                  required
+                  placeholder="e.g., 9876543210"
+                  value={form.mobileNumber}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      mobileNumber: e.target.value.replace(/\D/g, "").slice(0, 10),
+                    })
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-[#d35400]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Paid Amount (₹) *</label>
+                <input
+                  required
+                  type="number"
+                  min="1"
+                  placeholder="e.g., 500"
+                  value={form.paidAmount}
+                  onChange={(e) =>
+                    setForm({ ...form, paidAmount: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-[#d35400]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Payment Type</label>
+                <select
+                  value={form.paymentType}
+                  onChange={(e) =>
+                    setForm({ ...form, paymentType: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-[#d35400]"
+                >
+                  {PAYMENT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-sm font-medium">Collected By</label>
+                <input
+                  placeholder="e.g., Kumar"
+                  value={form.collectorName}
+                  onChange={(e) =>
+                    setForm({ ...form, collectorName: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-[#d35400]"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end border-t border-gray-100 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForm(false);
+                  setForm(initialForm);
+                }}
+                className="px-5 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-5 py-2 bg-[#d35400] text-white rounded-md text-sm font-medium hover:bg-[#b84400] disabled:opacity-70"
+              >
+                {isSubmitting ? "Saving..." : "Record Payment"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {!selectedFestivalId ? (
+        <EmptyState
+          icon={<Users className="h-12 w-12" />}
+          description="Select a festival to view collection records"
+        />
+      ) : loading ? (
+        <div className="flex justify-center py-12">
+          <Spinner />
+        </div>
+      ) : collections.length === 0 ? (
+        <EmptyState description="No payment records found. Add a payment to get started." />
+      ) : (
+        <div className="festive-card overflow-hidden">
+          <div className="p-4 pb-2">
+            <h3 className="text-lg font-serif font-bold">
+              Payment Records — {selectedFestival?.festivalName || selectedFestival?.name}
+            </h3>
+          </div>
+          <div className="overflow-x-auto px-2 pb-4">
+            <table className="w-full text-sm min-w-[800px]">
               <thead>
-                <tr>
-                  <th>Family</th>
-                  <th>
-                    <Phone className="table-icon" />
-                    Mobile
+                <tr className="border-b text-left text-xs uppercase text-gray-500">
+                  <th className="p-3 font-semibold">Family</th>
+                  <th className="p-3 font-semibold">
+                    <Phone className="w-3.5 h-3.5 inline mr-1" /> Mobile
                   </th>
-                  <th>Paid (₹)</th>
-                  <th>Balance (₹)</th>
-                  <th>Type</th>
-                  <th>Collector</th>
-                  <th>Status</th>
-                  <th></th>
+                  <th className="p-3 font-semibold">Paid (₹)</th>
+                  <th className="p-3 font-semibold">Balance (₹)</th>
+                  <th className="p-3 font-semibold">Type</th>
+                  <th className="p-3 font-semibold">Collector</th>
+                  <th className="p-3 font-semibold">Status</th>
+                  <th className="p-3 font-semibold" />
                 </tr>
               </thead>
               <tbody>
-                {familyTotals.map((family, index) => {
-                  const balance = getFamilyBalance(family.name);
-                  const status = getFamilyStatus(family.name);
-                  
+                {collections.map((c) => {
+                  const paid = Number(c.paidAmount) || 0;
+                  const total = Number(c.totalAmount) || 0;
+                  const balance = Math.max(0, total - paid);
+                  const isPaid = balance <= 0;
                   return (
-                    <tr key={`${family.name}-${index}`}>
-                      <td className="family-name-cell">{family.name}</td>
-                      <td className="mobile-cell">{family.mobile || "—"}</td>
-                      <td className={`paid-cell ${family.totalPaid > 0 ? "paid" : ""}`}>
-                        {formatCurrency(family.totalPaid)}
+                    <tr key={c.id} className="border-b border-gray-100 hover:bg-[#fef3e6]/50">
+                      <td className="p-3 font-semibold">{c.familyName}</td>
+                      <td className="p-3 text-gray-600 font-mono text-xs">
+                        {c.mobileNumber || "—"}
                       </td>
-                      <td className={`balance-cell ${balance === 0 ? "paid" : "due"}`}>
+                      <td className="p-3 font-semibold balance-positive">
+                        {formatCurrency(paid)}
+                      </td>
+                      <td
+                        className={`p-3 font-semibold ${
+                          isPaid ? "balance-positive" : "balance-negative"
+                        }`}
+                      >
                         {formatCurrency(balance)}
                       </td>
-                      <td>
-                        <span className={`payment-badge ${family.paymentType?.toLowerCase() || "cash"}`}>
-                          {family.paymentType || "Cash"}
+                      <td className="p-3">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                            typeBadge[c.paymentType] || typeBadge.Cash
+                          }`}
+                        >
+                          {c.paymentType || "Cash"}
                         </span>
                       </td>
-                      <td>{family.collector || "—"}</td>
-                      <td>
-                        <span className={`status-badge ${status.toLowerCase()}`}>
-                          {status === "Paid" ? (
-                            <CheckCircle className="status-icon" />
-                          ) : (
-                            <AlertCircle className="status-icon" />
-                          )}
-                          {status}
-                        </span>
+                      <td className="p-3 text-gray-600">{c.collectorName || "—"}</td>
+                      <td className="p-3">
+                        {isPaid ? (
+                          <span className="inline-flex items-center gap-1 text-green-700 text-xs font-semibold">
+                            <CheckCircle className="w-3.5 h-3.5" /> Paid
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-red-600 text-xs font-semibold">
+                            <AlertCircle className="w-3.5 h-3.5" /> Due
+                          </span>
+                        )}
                       </td>
-                      <td className="action-cell">
-                        {family.collections.map((collection) => (
-                          <button
-                            key={collection.id}
-                            onClick={() => handleDelete(collection.id)}
-                            className="btn-delete"
-                            title="Delete payment"
-                          >
-                            <Trash2 className="delete-icon" />
-                          </button>
-                        ))}
+                      <td className="p-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(c)}
+                          className="text-gray-400 hover:text-red-500 p-1"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-          </div>
-        </div>
-      ) : selectedFestivalId ? (
-        <div className="collection-empty">
-          <p>No payment records found for this festival.</p>
-          <button
-            onClick={handleOpenAddPayment}
-            className="btn-add-payment"
-          >
-            <Plus className="btn-icon" />
-            Add First Payment
-          </button>
-        </div>
-      ) : (
-        <div className="collection-empty">
-          <p>Please select a festival to view collection records</p>
-        </div>
-      )}
-
-      {/* Add Payment Modal */}
-      {isAddModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsAddModalOpen(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 className="modal-title">Add Payment</h3>
-            <form className="modal-form" onSubmit={handleAddPayment}>
-              <div className="modal-field">
-                <label>Family Name *</label>
-                <input
-                  name="familyName"
-                  value={newPayment.familyName}
-                  onChange={handlePaymentChange}
-                  type="text"
-                  placeholder="e.g., Sampath"
-                  required
-                />
-              </div>
-              <div className="modal-field">
-                <label>Mobile</label>
-                <input
-                  name="mobile"
-                  value={newPayment.mobile}
-                  onChange={handlePaymentChange}
-                  type="tel"
-                  placeholder="e.g., 93636 08094"
-                />
-              </div>
-              <div className="modal-field">
-                <label>Amount (₹) *</label>
-                <input
-                  name="amount"
-                  value={newPayment.amount}
-                  onChange={handlePaymentChange}
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="e.g., 1000"
-                  required
-                />
-              </div>
-              <div className="modal-field">
-                <label>Payment Type</label>
-                <select
-                  name="paymentType"
-                  value={newPayment.paymentType}
-                  onChange={handlePaymentChange}
-                >
-                  <option value="Cash">Cash</option>
-                  <option value="Online">Online</option>
-                </select>
-              </div>
-              <div className="modal-field">
-                <label>Collector</label>
-                <input
-                  name="collector"
-                  value={newPayment.collector}
-                  onChange={handlePaymentChange}
-                  type="text"
-                  placeholder="e.g., Guna"
-                />
-              </div>
-
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  className="modal-btn secondary"
-                  onClick={() => setIsAddModalOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button onClick={handleAddPayment} type="submit" className={`modal-btn primary ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`} disabled={isSubmitting}>
-                  {isSubmitting ? 'Saving...' : 'Save Payment'}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
