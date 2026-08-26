@@ -4,6 +4,8 @@ import { toast } from "../utils/toast";
 import { getFeedback, submitFeedback, deleteFeedback } from "../utils/api";
 import Spinner from "../components/Spinner";
 import { useConfirm } from "../components/ConfirmDialog";
+import { useAuth } from "../context/AuthContext";
+import { Link } from "react-router-dom";
 
 const FEATURES = [
   { id: 1, category: "Festivals", label: "Create festival with name, amount, dates" },
@@ -35,6 +37,7 @@ const RATING_LABELS = ["", "Poor", "Fair", "Good", "Very Good", "Excellent"];
 
 export default function Review() {
   const confirm = useConfirm();
+  const { isStaff, isOrganizer, canManageFestival } = useAuth();
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -175,54 +178,66 @@ export default function Review() {
               <span>💬</span> Share Your Feedback
             </h2>
           </div>
-          <form onSubmit={handleSubmit} className="p-4 pt-2 space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Rate your experience *</label>
-              <div className="flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    aria-label={`Rate ${star} stars`}
-                    onClick={() => setRating(star)}
-                    onMouseEnter={() => setHoverRating(star)}
-                    onMouseLeave={() => setHoverRating(0)}
-                    className="focus:outline-none rounded transition-transform hover:scale-110"
-                  >
-                    <Star
-                      className={`h-8 w-8 transition-colors ${
-                        star <= (hoverRating || rating)
-                          ? "fill-amber-400 text-amber-400"
-                          : "text-gray-300"
-                      }`}
-                    />
-                  </button>
-                ))}
-                {rating > 0 && (
-                  <span className="ml-2 text-sm text-gray-500">
-                    {RATING_LABELS[rating]}
-                  </span>
-                )}
+          {isStaff ? (
+            <form onSubmit={handleSubmit} className="p-4 pt-2 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Rate your experience *</label>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      aria-label={`Rate ${star} stars`}
+                      onClick={() => setRating(star)}
+                      onMouseEnter={() => setHoverRating(star)}
+                      onMouseLeave={() => setHoverRating(0)}
+                      className="focus:outline-none rounded transition-transform hover:scale-110"
+                    >
+                      <Star
+                        className={`h-8 w-8 transition-colors ${
+                          star <= (hoverRating || rating)
+                            ? "fill-amber-400 text-amber-400"
+                            : "text-gray-300"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  {rating > 0 && (
+                    <span className="ml-2 text-sm text-gray-500">
+                      {RATING_LABELS[rating]}
+                    </span>
+                  )}
+                </div>
               </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Your comment *</label>
+                <textarea
+                  rows={4}
+                  placeholder="Share your thoughts about the Village Festival Manager..."
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#d35400] focus:ring-1 focus:ring-[#d35400]"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full bg-[#d35400] hover:bg-[#b84400] text-white py-2.5 rounded-md text-sm font-semibold disabled:opacity-70"
+              >
+                {isSubmitting ? "Submitting..." : "Submit Feedback"}
+              </button>
+            </form>
+          ) : (
+            <div className="p-4 pt-2 text-sm text-gray-600 space-y-3">
+              <p>Only organizers and festival admins can submit feedback. Everyone can view reviews.</p>
+              <Link
+                to="/login"
+                className="inline-flex text-[#d35400] font-medium hover:underline"
+              >
+                Staff Login →
+              </Link>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Your comment *</label>
-              <textarea
-                rows={4}
-                placeholder="Share your thoughts about the Village Festival Manager..."
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#d35400] focus:ring-1 focus:ring-[#d35400]"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-[#d35400] hover:bg-[#b84400] text-white py-2.5 rounded-md text-sm font-semibold disabled:opacity-70"
-            >
-              {isSubmitting ? "Submitting..." : "Submit Feedback"}
-            </button>
-          </form>
+          )}
         </div>
 
         <div className="festive-card">
@@ -292,13 +307,15 @@ export default function Review() {
                             : ""}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(fb)}
-                        className="text-gray-300 hover:text-red-500 p-1"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {isStaff && (isOrganizer || canManageFestival(fb.festivalId)) && (
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(fb)}
+                          className="text-gray-300 hover:text-red-500 p-1"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -308,7 +325,7 @@ export default function Review() {
         </div>
       </div>
 
-      <div className="festive-card">
+      {/* <div className="festive-card">
         <div className="p-4 flex flex-wrap items-center gap-4 text-sm text-gray-500">
           <div>
             <span className="font-medium text-gray-800">Version:</span> 1.0.0
@@ -328,7 +345,7 @@ export default function Review() {
             {FEATURES.length} implemented
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }

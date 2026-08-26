@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ShoppingBag, Plus, Trash2 } from "lucide-react";
 import { toast } from "../utils/toast";
 import {
-  getFestivalsList,
+  getVisibleFestivalsList,
   getFestivalExpenses,
   createExpense,
   deleteExpense,
@@ -11,6 +11,7 @@ import FestivalSelect from "../components/FestivalSelect";
 import Spinner from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
 import { useConfirm } from "../components/ConfirmDialog";
+import { useAuth } from "../context/AuthContext";
 
 export const EXPENSE_CATEGORIES = [
   { label: "Food", value: "Food", icon: "🍜", color: "bg-orange-100 text-orange-800 border-orange-200" },
@@ -34,6 +35,7 @@ const initialForm = {
 
 export default function Expenses() {
   const confirm = useConfirm();
+  const { isStaff, canManageFestival } = useAuth();
   const [festivals, setFestivals] = useState([]);
   const [festivalsLoading, setFestivalsLoading] = useState(true);
   const [selectedFestivalId, setSelectedFestivalId] = useState("");
@@ -47,14 +49,18 @@ export default function Expenses() {
     (async () => {
       setFestivalsLoading(true);
       try {
-        setFestivals(await getFestivalsList());
+        const list = await getVisibleFestivalsList(isStaff);
+        setFestivals(list);
+        if (isStaff && list.length === 1) {
+          setSelectedFestivalId(String(list[0].id));
+        }
       } catch (error) {
         toast.apiError(error, "Failed to load festivals");
       } finally {
         setFestivalsLoading(false);
       }
     })();
-  }, []);
+  }, [isStaff]);
 
   const selectedFestival = festivals.find(
     (f) => String(f.id) === String(selectedFestivalId)
@@ -175,7 +181,9 @@ export default function Expenses() {
               onChange={setSelectedFestivalId}
               loading={festivalsLoading}
             />
-            {selectedFestivalId && (
+            {isStaff &&
+              selectedFestivalId &&
+              canManageFestival(selectedFestivalId) && (
               <button
                 type="button"
                 onClick={() => setShowForm(!showForm)}
@@ -198,7 +206,10 @@ export default function Expenses() {
         </div>
       </div>
 
-      {showForm && selectedFestival && (
+      {isStaff &&
+        canManageFestival(selectedFestivalId) &&
+        showForm &&
+        selectedFestival && (
         <div className="festive-card shadow-md">
           <div className="p-4 pb-2">
             <h2 className="text-lg font-serif font-bold flex items-center gap-2">
@@ -322,14 +333,19 @@ export default function Expenses() {
                     <div className="text-lg font-bold text-[#d35400] whitespace-nowrap">
                       {formatCurrency(expense.amount)}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(expense)}
-                      className="text-gray-400 hover:text-red-500 p-1.5"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {isStaff &&
+                      canManageFestival(
+                        expense.festivalId || selectedFestivalId
+                      ) && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(expense)}
+                        className="text-gray-400 hover:text-red-500 p-1.5"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 );
               })}

@@ -1,16 +1,25 @@
 import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
-const tabs = [
+const baseTabs = [
   { path: "/", match: ["/", "/festival"], label: "Festivals", icon: "⭐" },
   { path: "/collection", match: ["/collection"], label: "Collect", icon: "₹" },
   { path: "/expenses", match: ["/expenses"], label: "Expenses", icon: "🛍️" },
   { path: "/analytics", match: ["/analytics"], label: "Analytics", icon: "📊" },
   { path: "/review", match: ["/review"], label: "Review", icon: "💬" },
-  { path: "/users", match: ["/users"], label: "Users", icon: "👥" },
 ];
+
+const usersTab = {
+  path: "/users",
+  match: ["/users"],
+  label: "Users",
+  icon: "👥",
+};
 
 export default function BottomNav() {
   const location = useLocation();
+  const { isOrganizer } = useAuth();
+  const tabs = isOrganizer ? [...baseTabs, usersTab] : baseTabs;
 
   const isActive = (match) => match.includes(location.pathname);
 

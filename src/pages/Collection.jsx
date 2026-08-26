@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "../utils/toast";
 import {
-  getFestivalsList,
+  getVisibleFestivalsList,
   getCollectionsByFestival,
   createCollection,
   deleteCollection,
@@ -19,6 +19,7 @@ import FestivalSelect from "../components/FestivalSelect";
 import Spinner from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
 import { useConfirm } from "../components/ConfirmDialog";
+import { useAuth } from "../context/AuthContext";
 
 const PAYMENT_TYPES = ["Cash", "Online", "Cheque"];
 
@@ -38,6 +39,7 @@ const typeBadge = {
 
 export default function Collection() {
   const confirm = useConfirm();
+  const { isStaff, canManageFestival } = useAuth();
   const [festivals, setFestivals] = useState([]);
   const [festivalsLoading, setFestivalsLoading] = useState(true);
   const [selectedFestivalId, setSelectedFestivalId] = useState("");
@@ -51,14 +53,18 @@ export default function Collection() {
     (async () => {
       setFestivalsLoading(true);
       try {
-        setFestivals(await getFestivalsList());
+        const list = await getVisibleFestivalsList(isStaff);
+        setFestivals(list);
+        if (isStaff && list.length === 1) {
+          setSelectedFestivalId(String(list[0].id));
+        }
       } catch (error) {
         toast.apiError(error, "Failed to load festivals");
       } finally {
         setFestivalsLoading(false);
       }
     })();
-  }, []);
+  }, [isStaff]);
 
   const selectedFestival = festivals.find(
     (f) => String(f.id) === String(selectedFestivalId)
@@ -193,7 +199,9 @@ export default function Collection() {
               onChange={setSelectedFestivalId}
               loading={festivalsLoading}
             />
-            {selectedFestivalId && (
+            {isStaff &&
+              selectedFestivalId &&
+              canManageFestival(selectedFestivalId) && (
               <button
                 type="button"
                 onClick={() => setShowForm(!showForm)}
@@ -227,7 +235,10 @@ export default function Collection() {
         </div>
       </div>
 
-      {showForm && selectedFestival && (
+      {isStaff &&
+        canManageFestival(selectedFestivalId) &&
+        showForm &&
+        selectedFestival && (
         <div className="festive-card shadow-md">
           <div className="p-4 pb-2 flex items-center gap-2">
             <span>💰</span>
@@ -413,14 +424,16 @@ export default function Collection() {
                         )}
                       </td>
                       <td className="p-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(c)}
-                          className="text-gray-400 hover:text-red-500 p-1"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {isStaff && canManageFestival(c.festivalId || selectedFestivalId) && (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(c)}
+                            className="text-gray-400 hover:text-red-500 p-1"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

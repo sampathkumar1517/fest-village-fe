@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { login } from '../utils/api';
 import { toast, getApiErrorMessage } from '../utils/toast';
+import { useAuth } from '../context/AuthContext';
 
 const LoginPage = () => {
     const navigate = useNavigate();
+    const { refresh } = useAuth();
     const [mobileNumber, setMobileNumber] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -39,13 +41,23 @@ const LoginPage = () => {
             const data = await login({ phoneNumber: mobileNumber, password });
             
             if (data.access_token) {
-                setSuccess('Login successful! Redirecting...');
-                toast.success('Login successful! Redirecting...');
+                refresh();
+                const role = data.user?.role;
+                if (role === 'organizer') {
+                  setSuccess('Organizer login successful!');
+                  toast.success('Welcome, Organizer!');
+                } else if (role === 'admin') {
+                  setSuccess('Festival admin login successful!');
+                  toast.success('Welcome — you can manage your assigned festival(s).');
+                } else {
+                  setSuccess('Login successful! Viewing only.');
+                  toast.success('Logged in. Staff role required to edit.');
+                }
                 setMobileNumber('');
                 setPassword('');
                 setTimeout(() => {
-                    navigate('/');
-                }, 1500);
+                    navigate(role === 'organizer' ? '/' : '/');
+                }, 1000);
             } else {
                 const msg = 'Login failed. No token received.';
                 setError(msg);
@@ -126,10 +138,9 @@ const LoginPage = () => {
                 </form>
 
                 <div className="text-center mt-[30px] text-[14px]">
-                    <a className="text-[#d35400] no-underline transition-colors hover:text-[#b84400] hover:underline" href="#forgot-password">Forgot Password?</a>
-                    <span className="text-[#ddd] mx-[10px]">•</span>
-                    <Link className="text-[#d35400] no-underline transition-colors hover:text-[#b84400] hover:underline" to="/register">Create Account</Link>
+                    <Link className="text-[#d35400] no-underline hover:underline" to="/organizer/login">Organizer Login</Link>
                 </div>
+                <p className="text-center text-xs text-[#999] mt-3">Festival admin / staff login</p>
             </div>
             <style jsx>{`
                 @keyframes slideUp {

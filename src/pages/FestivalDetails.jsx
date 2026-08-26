@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2, Star, IndianRupee, Calendar, Users, UserCheck } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "../utils/toast";
 import {
-  getFestivalsList,
+  getVisibleFestivalsList,
   createFestival,
   deleteFestival,
 } from "../utils/api";
 import Spinner from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
 import { useConfirm } from "../components/ConfirmDialog";
+import { useAuth } from "../context/AuthContext";
 
 const initialForm = {
   name: "",
@@ -28,6 +30,7 @@ function formatDate(value) {
 
 export default function FestivalDetails() {
   const confirm = useConfirm();
+  const { isOrganizer, isStaff, canManageFestival, refresh } = useAuth();
   const [festivals, setFestivals] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -38,7 +41,7 @@ export default function FestivalDetails() {
   const fetchFestivals = async () => {
     setIsLoading(true);
     try {
-      const list = await getFestivalsList();
+      const list = await getVisibleFestivalsList(isStaff);
       setFestivals(list);
     } catch (error) {
       console.error(error);
@@ -51,7 +54,7 @@ export default function FestivalDetails() {
 
   useEffect(() => {
     fetchFestivals();
-  }, []);
+  }, [isStaff]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -74,6 +77,8 @@ export default function FestivalDetails() {
       setForm(initialForm);
       setShowForm(false);
       await fetchFestivals();
+      await refresh();
+      toast.info("Next: open Users to create a festival admin for this festival.");
     } catch (error) {
       toast.apiError(error, "Failed to create festival");
     } finally {
@@ -114,16 +119,26 @@ export default function FestivalDetails() {
             Manage your village festival details
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowForm(!showForm)}
-          className="bg-[#d35400] hover:bg-[#b84400] text-white px-4 py-2 rounded-md font-medium flex items-center gap-2 text-sm shadow-sm"
-        >
-          <Plus className="w-4 h-4" /> Add Festival
-        </button>
+        {isOrganizer && (
+          <div className="flex items-center gap-2">
+            <Link
+              to="/users"
+              className="hidden sm:inline-flex border border-[#d35400]/40 text-[#d35400] hover:bg-[#fff3e0] px-3 py-2 rounded-md text-sm font-medium"
+            >
+              Manage Admins
+            </Link>
+            <button
+              type="button"
+              onClick={() => setShowForm(!showForm)}
+              className="bg-[#d35400] hover:bg-[#b84400] text-white px-4 py-2 rounded-md font-medium flex items-center gap-2 text-sm shadow-sm"
+            >
+              <Plus className="w-4 h-4" /> Add Festival
+            </button>
+          </div>
+        )}
       </div>
 
-      {showForm && (
+      {isOrganizer && showForm && (
         <div className="festive-card shadow-md">
           <div className="p-5 pb-3">
             <h2 className="text-lg font-serif font-bold text-gray-900 flex items-center gap-2">
@@ -232,15 +247,21 @@ export default function FestivalDetails() {
         <EmptyState
           icon={<span className="text-5xl">🪔</span>}
           title="No festivals yet"
-          description="Create your first festival to start tracking collections"
+          description={
+            isOrganizer
+              ? "Create your first festival to start tracking collections"
+              : "No festivals published yet. Check back later."
+          }
           action={
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              className="bg-[#d35400] text-white px-5 py-2.5 rounded-md font-medium inline-flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" /> Add First Festival
-            </button>
+            isOrganizer ? (
+              <button
+                type="button"
+                onClick={() => setShowForm(true)}
+                className="bg-[#d35400] text-white px-5 py-2.5 rounded-md font-medium inline-flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Add First Festival
+              </button>
+            ) : null
           }
         />
       ) : (
@@ -260,15 +281,17 @@ export default function FestivalDetails() {
                       Active
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(festival)}
-                    disabled={deletingId === festival.id}
-                    className="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md"
-                    title="Delete festival"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {isOrganizer && canManageFestival(festival.id) && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(festival)}
+                      disabled={deletingId === festival.id}
+                      className="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md"
+                      title="Delete festival"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="px-4 pb-4 space-y-2.5 text-sm">

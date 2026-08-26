@@ -19,7 +19,7 @@ import {
   Cell,
 } from "recharts";
 import {
-  getFestivalsList,
+  getVisibleFestivalsList,
   getFestivalSummary,
   getCollectionsByFestival,
   getFestivalExpenses,
@@ -27,6 +27,7 @@ import {
 import FestivalSelect from "../components/FestivalSelect";
 import Spinner from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
+import { useAuth } from "../context/AuthContext";
 
 const CATEGORY_COLORS = {
   Food: "#ea580c",
@@ -62,6 +63,7 @@ function SummaryCard({ label, value, icon, color, sub }) {
 }
 
 export default function Analytics() {
+  const { isStaff } = useAuth();
   const [festivals, setFestivals] = useState([]);
   const [festivalsLoading, setFestivalsLoading] = useState(true);
   const [selectedFestivalId, setSelectedFestivalId] = useState("");
@@ -74,14 +76,18 @@ export default function Analytics() {
     (async () => {
       setFestivalsLoading(true);
       try {
-        setFestivals(await getFestivalsList());
+        const list = await getVisibleFestivalsList(isStaff);
+        setFestivals(list);
+        if (isStaff && list.length === 1) {
+          setSelectedFestivalId(String(list[0].id));
+        }
       } catch (error) {
         toast.apiError(error, "Failed to load festivals");
       } finally {
         setFestivalsLoading(false);
       }
     })();
-  }, []);
+  }, [isStaff]);
 
   const selectedFestival = festivals.find(
     (f) => String(f.id) === String(selectedFestivalId)

@@ -7,15 +7,18 @@ import {
   MessageSquare,
   Users,
 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 export default function NavTabs() {
+  const { isOrganizer } = useAuth();
+
   const tabs = [
     { name: "Festivals", path: "/", icon: Star },
     { name: "Collections", path: "/collection", icon: IndianRupee },
     { name: "Expenses", path: "/expenses", icon: ShoppingBag },
     { name: "Analytics", path: "/analytics", icon: TrendingUp },
     { name: "Review", path: "/review", icon: MessageSquare },
-    { name: "Users", path: "/users", icon: Users },
+    ...(isOrganizer ? [{ name: "Users", path: "/users", icon: Users }] : []),
   ];
 
   return (

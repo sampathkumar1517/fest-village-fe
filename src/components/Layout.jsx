@@ -18,7 +18,10 @@ const toasterProps = {
 export default function Layout() {
   const location = useLocation();
   const isAuthPage =
-    location.pathname === "/login" || location.pathname === "/register";
+    location.pathname === "/login" ||
+    location.pathname === "/register" ||
+    location.pathname === "/organizer/login" ||
+    location.pathname === "/organizer/register";
 
   if (isAuthPage) {
     return (
@@ -39,13 +42,6 @@ export default function Layout() {
         <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-6 pb-24 sm:pb-6">
           <Outlet />
         </main>
-
-        <footer className="hidden sm:block py-5 text-center text-[13px] text-[#999] border-t border-[#e8d4ba] mt-auto">
-          <p>
-            © 2026. Built with <span className="text-[#ff6b6b] mx-[2px]">❤</span>{" "}
-            using caffeine.ai
-          </p>
-        </footer>
 
         <BottomNav />
       </div>

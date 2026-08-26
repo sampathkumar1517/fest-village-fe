@@ -55,6 +55,20 @@ export const register = async (userData) => {
   return response.data;
 };
 
+export const registerOrganizer = async (data) => {
+  const response = await api.post("/organizers/register", data);
+  return response.data;
+};
+
+export const loginOrganizer = async (credentials) => {
+  const response = await api.post("/organizers/login", credentials);
+  if (response.data.access_token) {
+    localStorage.setItem("access_token", response.data.access_token);
+    localStorage.setItem("user", JSON.stringify(response.data.user));
+  }
+  return response.data;
+};
+
 // ================= Festival =================
 export const createFestival = async (festivalData) => {
   const response = await api.post("/festival/create-festival", festivalData);
@@ -81,9 +95,40 @@ export const getFestivalSummary = async (id) => {
   return response.data;
 };
 
+export const getManageableFestivals = async () => {
+  const response = await api.get("/festival/manageable");
+  return response.data;
+};
+
+/** Festivals visible for the current session: scoped for staff, all for public. */
+export const getVisibleFestivalsList = async (isStaff) => {
+  if (isStaff) {
+    const res = await getManageableFestivals();
+    return Array.isArray(res?.data) ? res.data : [];
+  }
+  return getFestivalsList();
+};
+
 // ================= Users =================
 export const createUser = async (userData) => {
   const response = await api.post("/users/create-user", userData);
+  return response.data;
+};
+
+export const createFestivalAdmin = async (data) => {
+  const response = await api.post("/users/festival-admins", data);
+  return response.data;
+};
+
+export const getFestivalAdmins = async (festivalId) => {
+  const response = await api.get("/users/festival-admins", {
+    params: { festivalId },
+  });
+  return response.data;
+};
+
+export const removeFestivalAdmin = async (assignmentId) => {
+  const response = await api.delete(`/users/festival-admins/${assignmentId}`);
   return response.data;
 };
 
